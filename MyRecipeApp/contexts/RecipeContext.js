@@ -16,7 +16,19 @@ export const RecipeProvider = ({ children }) => {
     try {
       const storedRecipes = await AsyncStorage.getItem('recipes');
       if (storedRecipes) {
-        setRecipes(JSON.parse(storedRecipes));
+        const parsed = JSON.parse(storedRecipes);
+        // Normalize types to prevent casting errors
+        const normalized = parsed.map(recipe => ({
+          ...recipe,
+          title: String(recipe.title || ''),
+          category: String(recipe.category || ''),
+          ingredients: String(recipe.ingredients || ''),
+          instructions: String(recipe.instructions || ''),
+          prepTime: String(recipe.prepTime || ''),
+          cookTime: String(recipe.cookTime || ''),
+          id: String(recipe.id || Date.now())
+        }));
+        setRecipes(normalized);
       }
     } catch (error) {
       console.error('Error loading recipes:', error);
@@ -33,13 +45,33 @@ export const RecipeProvider = ({ children }) => {
   };
 
   const addRecipe = (recipe) => {
-    const newRecipes = [...recipes, { ...recipe, id: Date.now().toString() }];
+    const normalizedRecipe = {
+      ...recipe,
+      id: Date.now().toString(),
+      title: String(recipe.title || ''),
+      category: String(recipe.category || ''),
+      ingredients: String(recipe.ingredients || ''),
+      instructions: String(recipe.instructions || ''),
+      prepTime: String(recipe.prepTime || ''),
+      cookTime: String(recipe.cookTime || '')
+    };
+    const newRecipes = [...recipes, normalizedRecipe];
     saveRecipes(newRecipes);
   };
 
   const updateRecipe = (id, updatedRecipe) => {
+    const normalizedRecipe = {
+      ...updatedRecipe,
+      id: String(id),
+      title: String(updatedRecipe.title || ''),
+      category: String(updatedRecipe.category || ''),
+      ingredients: String(updatedRecipe.ingredients || ''),
+      instructions: String(updatedRecipe.instructions || ''),
+      prepTime: String(updatedRecipe.prepTime || ''),
+      cookTime: String(updatedRecipe.cookTime || '')
+    };
     const newRecipes = recipes.map(recipe =>
-      recipe.id === id ? { ...updatedRecipe, id } : recipe
+      recipe.id === id ? normalizedRecipe : recipe
     );
     saveRecipes(newRecipes);
   };

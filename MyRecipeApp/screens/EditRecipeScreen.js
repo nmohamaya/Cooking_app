@@ -6,12 +6,12 @@ const EditRecipeScreen = ({ route, navigation }) => {
   const { recipe } = route.params;
   const { updateRecipe } = useRecipes();
 
-  const [title, setTitle] = useState(recipe.title);
-  const [category, setCategory] = useState(recipe.category);
-  const [ingredients, setIngredients] = useState(recipe.ingredients);
-  const [instructions, setInstructions] = useState(recipe.instructions);
-  const [prepTime, setPrepTime] = useState(recipe.prepTime);
-  const [cookTime, setCookTime] = useState(recipe.cookTime);
+  const [title, setTitle] = useState(String(recipe.title || ''));
+  const [category, setCategory] = useState(String(recipe.category || ''));
+  const [ingredients, setIngredients] = useState(String(recipe.ingredients || ''));
+  const [instructions, setInstructions] = useState(String(recipe.instructions || ''));
+  const [prepTime, setPrepTime] = useState(String(recipe.prepTime || ''));
+  const [cookTime, setCookTime] = useState(String(recipe.cookTime || ''));
 
   const handleSave = () => {
     if (!title.trim()) {
