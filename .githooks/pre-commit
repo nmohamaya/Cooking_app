@@ -1,0 +1,25 @@
+#!/bin/sh
+# Pre-commit hook - runs tests and security checks before committing
+
+cd MyRecipeApp
+
+echo "🔍 Running pre-commit checks..."
+
+# Run tests
+echo "📝 Running tests..."
+npm test -- --passWithNoTests --bail
+if [ $? -ne 0 ]; then
+  echo "❌ Tests failed. Commit aborted."
+  exit 1
+fi
+
+# Run security audit
+echo "🔒 Running security audit..."
+npm run security
+if [ $? -ne 0 ]; then
+  echo "⚠️  Security audit found issues"
+  exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"
+exit 0
