@@ -8,9 +8,11 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "jest --passWithNoTests",
-    "lint": "eslint .",
-    "security": "npm audit"
+    "test": "jest --passWithNoTests --coverage",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage --passWithNoTests",
+    "lint": "eslint . --ext .js,.jsx",
+    "security": "npm audit --audit-level=moderate"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
