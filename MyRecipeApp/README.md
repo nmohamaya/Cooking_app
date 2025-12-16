@@ -100,6 +100,10 @@ npm run lint
 
 ## Project Workflow
 
+### ⚠️ IMPORTANT: Never Work Directly on Main Branch
+
+**ALWAYS create a feature branch before making any code changes.** Direct commits to `main` are not allowed.
+
 ### Development Process
 
 #### 1. Create Issue
@@ -108,8 +112,8 @@ npm run lint
 - **Labels:** `enhancement`, `bug`, `security`, `documentation`, or `chore`
 - **Assign:** Assign to yourself or team member
 
-#### 2. Create Branch
-Always branch from `main`:
+#### 2. Create Branch (REQUIRED)
+**Always branch from `main` before making any changes:**
 ```bash
 git checkout main
 git pull origin main
@@ -260,13 +264,46 @@ MyRecipeApp/
 └── app.json           # Expo configuration
 ```
 
+## Testing Documentation
+
+### Automated Tests
+
+The AI recipe extraction feature has been thoroughly tested:
+
+- **[TESTING_SUMMARY.md](TESTING_SUMMARY.md)** - Quick overview and results
+- **[TEST_RESULTS_REPORT.md](TEST_RESULTS_REPORT.md)** - Comprehensive test report
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Manual testing procedures
+
+### Test Scripts
+
+```bash
+# Run single transcript test
+node test-extraction-api.js
+
+# Run all 6 transcript tests
+node test-all-transcripts.js
+```
+
+### Test Data
+
+- **test-transcripts.js** - Raw transcript data (6 diverse recipes)
+- **TEST_TRANSCRIPTS_COPY.md** - Easy copy-paste format for manual testing
+
+### Test Results Summary
+
+✅ **100% Success Rate** (6/6 tests)  
+⭐ **93% Quality Score** (6.5/7 average)  
+⏱️ **2.7s Avg Response Time**  
+💰 **$0.00 Cost** (FREE GitHub Models API)
+
 ## Contributing
 
-1. Follow the project workflow above
-2. Ensure all tests pass
-3. Update documentation as needed
-4. Add tests for new features
-5. Follow commit message conventions
+1. **ALWAYS create a branch** before making changes (never work on main)
+2. Follow the project workflow above
+3. Ensure all tests pass
+4. Update documentation as needed
+5. Add tests for new features
+6. Follow commit message conventions
 
 ## License
 
