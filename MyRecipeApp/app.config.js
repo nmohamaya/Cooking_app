@@ -26,7 +26,7 @@ export default {
       favicon: './assets/favicon.png',
     },
     extra: {
-      openaiApiKey: process.env.OPENAI_API_KEY,
+      githubToken: process.env.GITHUB_TOKEN,
     },
   },
 };

@@ -1,10 +1,12 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
 
-// OpenAI API Configuration
+// GitHub Models API Configuration
 // In React Native/Expo, use Constants.expoConfig.extra for environment variables
-const OPENAI_API_KEY = Constants.expoConfig?.extra?.openaiApiKey || '';
-const OPENAI_API_URL = 'https://api.openai.com/v1';
+// Using GitHub Models provides free access to AI models for GitHub users
+const GITHUB_TOKEN = Constants.expoConfig?.extra?.githubToken || '';
+const API_URL = 'https://models.inference.ai.azure.com';
+const MODEL_NAME = 'gpt-4o'; // Free GitHub Models: gpt-4o, gpt-4o-mini, llama-3.1-405b, etc.
 
 /**
  * Extract recipe from cooking video URL
@@ -13,8 +15,8 @@ const OPENAI_API_URL = 'https://api.openai.com/v1';
  */
 export const extractRecipeFromVideo = async (videoUrl) => {
   try {
-    if (!OPENAI_API_KEY) {
-      throw new Error('OpenAI API key not configured. Please add OPENAI_API_KEY to .env file.');
+    if (!GITHUB_TOKEN) {
+      throw new Error('GitHub token not configured. Please add GITHUB_TOKEN to .env file.');
     }
 
     // Step 1: Get video transcript
@@ -60,9 +62,9 @@ const getVideoTranscript = async (videoUrl) => {
 export const extractRecipeFromTranscript = async (transcript) => {
   try {
     const response = await axios.post(
-      `${OPENAI_API_URL}/chat/completions`,
+      `${API_URL}/chat/completions`,
       {
-        model: 'gpt-4',
+        model: MODEL_NAME,
         messages: [
           {
             role: 'system',
@@ -87,7 +89,7 @@ If any field is not mentioned in the transcript, use empty string. Be concise an
       },
       {
         headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Authorization': `Bearer ${GITHUB_TOKEN}`,
           'Content-Type': 'application/json'
         }
       }
