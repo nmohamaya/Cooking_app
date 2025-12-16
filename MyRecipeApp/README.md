@@ -54,20 +54,22 @@ npm run ios
 
 #### AI Recipe Extraction Setup
 
-To enable automatic recipe extraction from video descriptions/transcripts:
+To enable automatic recipe extraction from video descriptions/transcripts using **GitHub Models (FREE)**:
 
-1. **Get an OpenAI API Key:**
-   - Sign up at https://platform.openai.com
-   - Navigate to API Keys section
-   - Create a new API key
+1. **Get a GitHub Personal Access Token:**
+   - Go to https://github.com/settings/tokens
+   - Click "Generate new token (classic)"
+   - Give it a name (e.g., "Cooking App")
+   - Select scopes: `repo`, `read:packages`
+   - Click "Generate token" and copy it
 
 2. **Configure Environment:**
    ```bash
    # Copy the example file
    cp .env.example .env
    
-   # Edit .env and add your API key
-   OPENAI_API_KEY=sk-your-actual-key-here
+   # Edit .env and add your GitHub token
+   GITHUB_TOKEN=ghp_your_actual_token_here
    ```
 
 3. **Restart the server:**
@@ -75,7 +77,7 @@ To enable automatic recipe extraction from video descriptions/transcripts:
    npm start
    ```
 
-**Note:** The recipe extraction feature requires an OpenAI API key and incurs usage costs (~$0.01-0.05 per extraction). Without the API key, you can still add recipes manually.
+**Note:** GitHub Models provides **FREE** access to GPT-4o and other AI models for GitHub users. No credit card required! Without the token, you can still add recipes manually.
 
 ### Testing
 
