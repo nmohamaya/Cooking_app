@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, ScrollView, Image, Linking } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, ScrollView, Image, Linking, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { extractRecipeFromText } from './services/recipeExtraction';
 
 export default function App() {
   const [recipes, setRecipes] = useState([]);
   const [screen, setScreen] = useState('home'); // 'home', 'add', 'detail', 'edit'
   const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [extracting, setExtracting] = useState(false); // Loading state for extraction
   const [form, setForm] = useState({ 
     title: '', 
     category: '', 
@@ -128,6 +130,51 @@ export default function App() {
     if (!result.canceled) {
       setForm({ ...form, imageUri: result.assets[0].uri });
     }
+  };
+
+  // Extract recipe from video description or transcript
+  const handleExtractRecipe = async () => {
+    Alert.prompt(
+      'Extract Recipe',
+      'Paste the video description, transcript, or recipe text:',
+      async (text) => {
+        if (!text || !text.trim()) {
+          Alert.alert('Error', 'Please provide recipe text to extract');
+          return;
+        }
+
+        setExtracting(true);
+        try {
+          const extractedRecipe = await extractRecipeFromText(text);
+          
+          // Merge extracted data with existing form data (keep videoUrl and imageUri)
+          setForm({
+            ...form,
+            title: extractedRecipe.title || form.title,
+            category: extractedRecipe.category || form.category,
+            ingredients: extractedRecipe.ingredients || form.ingredients,
+            instructions: extractedRecipe.instructions || form.instructions,
+            prepTime: extractedRecipe.prepTime || form.prepTime,
+            cookTime: extractedRecipe.cookTime || form.cookTime,
+          });
+
+          Alert.alert(
+            'Success',
+            'Recipe extracted! Please review and edit the fields as needed.',
+            [{ text: 'OK' }]
+          );
+        } catch (error) {
+          console.error('Extraction error:', error);
+          Alert.alert(
+            'Extraction Failed',
+            error.message || 'Failed to extract recipe. Please check your OpenAI API key in .env file and try again.'
+          );
+        } finally {
+          setExtracting(false);
+        }
+      },
+      'plain-text'
+    );
   };
 
   // Export recipes to JSON file
@@ -265,6 +312,21 @@ export default function App() {
     return (
       <ScrollView style={styles.container}>
         <Text style={styles.header}>Add Recipe</Text>
+        
+        {/* AI Extraction Button */}
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: '#6366f1', marginBottom: 10 }]} 
+          onPress={handleExtractRecipe}
+          disabled={extracting}
+        >
+          {extracting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>🤖 Extract Recipe from Text</Text>
+          )}
+        </TouchableOpacity>
+        {extracting && <Text style={styles.loadingText}>Extracting recipe using AI...</Text>}
+        
         <TextInput
           style={styles.input}
           placeholder="Recipe Title"
@@ -396,6 +458,21 @@ export default function App() {
     return (
       <ScrollView style={styles.container}>
         <Text style={styles.header}>Edit Recipe</Text>
+        
+        {/* AI Extraction Button */}
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: '#6366f1', marginBottom: 10 }]} 
+          onPress={handleExtractRecipe}
+          disabled={extracting}
+        >
+          {extracting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>🤖 Extract Recipe from Text</Text>
+          )}
+        </TouchableOpacity>
+        {extracting && <Text style={styles.loadingText}>Extracting recipe using AI...</Text>}
+        
         <TextInput
           style={styles.input}
           placeholder="Recipe Title"
@@ -575,5 +652,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     marginTop: 30,
+  },
+  loadingText: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#6366f1',
+    marginBottom: 10,
+    fontStyle: 'italic',
   },
 });

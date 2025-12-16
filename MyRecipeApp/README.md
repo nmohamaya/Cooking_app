@@ -7,6 +7,7 @@ A React Native cooking recipe app with media support, export/import functionalit
 - 📝 Create, edit, and delete recipes
 - 📷 Add images from camera/gallery
 - 🎥 Link TikTok/YouTube videos to recipes
+- 🤖 **NEW:** AI-powered recipe extraction from text/transcripts
 - 📤 Export recipes to JSON
 - 📥 Import recipes from JSON
 - 🔍 Browse and search recipes
@@ -48,6 +49,33 @@ npm run android
 # Run on iOS (macOS only)
 npm run ios
 ```
+
+### Configuration (Optional)
+
+#### AI Recipe Extraction Setup
+
+To enable automatic recipe extraction from video descriptions/transcripts:
+
+1. **Get an OpenAI API Key:**
+   - Sign up at https://platform.openai.com
+   - Navigate to API Keys section
+   - Create a new API key
+
+2. **Configure Environment:**
+   ```bash
+   # Copy the example file
+   cp .env.example .env
+   
+   # Edit .env and add your API key
+   OPENAI_API_KEY=sk-your-actual-key-here
+   ```
+
+3. **Restart the server:**
+   ```bash
+   npm start
+   ```
+
+**Note:** The recipe extraction feature requires an OpenAI API key and incurs usage costs (~$0.01-0.05 per extraction). Without the API key, you can still add recipes manually.
 
 ### Testing
 
