@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, ScrollView, Image, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, ScrollView, Image, Linking, ActivityIndicator, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -11,6 +11,8 @@ export default function App() {
   const [screen, setScreen] = useState('home'); // 'home', 'add', 'detail', 'edit'
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [extracting, setExtracting] = useState(false); // Loading state for extraction
+  const [showExtractionModal, setShowExtractionModal] = useState(false);
+  const [extractionText, setExtractionText] = useState('');
   const [form, setForm] = useState({ 
     title: '', 
     category: '', 
@@ -133,48 +135,48 @@ export default function App() {
   };
 
   // Extract recipe from video description or transcript
-  const handleExtractRecipe = async () => {
-    Alert.prompt(
-      'Extract Recipe',
-      'Paste the video description, transcript, or recipe text:',
-      async (text) => {
-        if (!text || !text.trim()) {
-          Alert.alert('Error', 'Please provide recipe text to extract');
-          return;
-        }
+  const handleExtractRecipe = () => {
+    setShowExtractionModal(true);
+  };
 
-        setExtracting(true);
-        try {
-          const extractedRecipe = await extractRecipeFromText(text);
-          
-          // Merge extracted data with existing form data (keep videoUrl and imageUri)
-          setForm({
-            ...form,
-            title: extractedRecipe.title || form.title,
-            category: extractedRecipe.category || form.category,
-            ingredients: extractedRecipe.ingredients || form.ingredients,
-            instructions: extractedRecipe.instructions || form.instructions,
-            prepTime: extractedRecipe.prepTime || form.prepTime,
-            cookTime: extractedRecipe.cookTime || form.cookTime,
-          });
+  const performExtraction = async () => {
+    if (!extractionText || !extractionText.trim()) {
+      Alert.alert('Error', 'Please provide recipe text to extract');
+      return;
+    }
 
-          Alert.alert(
-            'Success',
-            'Recipe extracted! Please review and edit the fields as needed.',
-            [{ text: 'OK' }]
-          );
-        } catch (error) {
-          console.error('Extraction error:', error);
-          Alert.alert(
-            'Extraction Failed',
-            error.message || 'Failed to extract recipe. Please check your OpenAI API key in .env file and try again.'
-          );
-        } finally {
-          setExtracting(false);
-        }
-      },
-      'plain-text'
-    );
+    setShowExtractionModal(false);
+    setExtracting(true);
+    
+    try {
+      const extractedRecipe = await extractRecipeFromText(extractionText);
+      
+      // Merge extracted data with existing form data (keep videoUrl and imageUri)
+      setForm({
+        ...form,
+        title: extractedRecipe.title || form.title,
+        category: extractedRecipe.category || form.category,
+        ingredients: extractedRecipe.ingredients || form.ingredients,
+        instructions: extractedRecipe.instructions || form.instructions,
+        prepTime: extractedRecipe.prepTime || form.prepTime,
+        cookTime: extractedRecipe.cookTime || form.cookTime,
+      });
+
+      setExtractionText('');
+      Alert.alert(
+        'Success',
+        'Recipe extracted! Please review and edit the fields as needed.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Extraction error:', error);
+      Alert.alert(
+        'Extraction Failed',
+        error.message || 'Failed to extract recipe. Please check your GitHub token in .env file and try again.'
+      );
+    } finally {
+      setExtracting(false);
+    }
   };
 
   // Export recipes to JSON file
@@ -387,6 +389,53 @@ export default function App() {
         <TouchableOpacity style={[styles.button, { backgroundColor: '#666' }]} onPress={() => setScreen('home')}>
           <Text style={styles.buttonText}>Cancel</Text>
         </TouchableOpacity>
+
+        {/* Extraction Modal */}
+        <Modal
+          visible={showExtractionModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowExtractionModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Extract Recipe</Text>
+              <Text style={styles.modalSubtitle}>
+                Paste video description, transcript, or recipe text:
+              </Text>
+              
+              <TextInput
+                style={styles.modalTextInput}
+                multiline
+                numberOfLines={10}
+                value={extractionText}
+                onChangeText={setExtractionText}
+                placeholder="Example: Today I'm making spaghetti carbonara. You'll need pasta, eggs, cheese..."
+                textAlignVertical="top"
+              />
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel]} 
+                  onPress={() => {
+                    setShowExtractionModal(false);
+                    setExtractionText('');
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonExtract]} 
+                  onPress={performExtraction}
+                  disabled={!extractionText.trim()}
+                >
+                  <Text style={styles.modalButtonText}>Extract</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     );
   }
@@ -533,6 +582,53 @@ export default function App() {
         <TouchableOpacity style={[styles.button, { backgroundColor: '#666' }]} onPress={() => setScreen('home')}>
           <Text style={styles.buttonText}>Cancel</Text>
         </TouchableOpacity>
+
+        {/* Extraction Modal */}
+        <Modal
+          visible={showExtractionModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowExtractionModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Extract Recipe</Text>
+              <Text style={styles.modalSubtitle}>
+                Paste video description, transcript, or recipe text:
+              </Text>
+              
+              <TextInput
+                style={styles.modalTextInput}
+                multiline
+                numberOfLines={10}
+                value={extractionText}
+                onChangeText={setExtractionText}
+                placeholder="Example: Today I'm making spaghetti carbonara. You'll need pasta, eggs, cheese..."
+                textAlignVertical="top"
+              />
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel]} 
+                  onPress={() => {
+                    setShowExtractionModal(false);
+                    setExtractionText('');
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonExtract]} 
+                  onPress={performExtraction}
+                  disabled={!extractionText.trim()}
+                >
+                  <Text style={styles.modalButtonText}>Extract</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     );
   }
@@ -659,5 +755,65 @@ const styles = StyleSheet.create({
     color: '#6366f1',
     marginBottom: 10,
     fontStyle: 'italic',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  modalTextInput: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 200,
+    maxHeight: 300,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    fontSize: 14,
+    marginBottom: 15,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: '#666',
+  },
+  modalButtonExtract: {
+    backgroundColor: '#6366f1',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
