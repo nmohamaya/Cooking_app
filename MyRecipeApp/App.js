@@ -5,6 +5,11 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { extractRecipeFromText } from './services/recipeExtraction';
+import { Picker } from '@react-native-picker/picker';
+
+// Predefined categories and tags
+const CATEGORIES = ['Main Dish', 'Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers'];
+const TAGS = ['Quick', 'Vegetarian', 'Vegan', 'Spicy', 'Easy', 'Healthy'];
 
 export default function App() {
   const [recipes, setRecipes] = useState([]);
@@ -27,6 +32,7 @@ export default function App() {
   const [filters, setFilters] = useState({
     prepTimeMax: null, // in minutes
     cookTimeMax: null, // in minutes
+    category: 'All', // 'All' or specific category
   });
   const [sortBy, setSortBy] = useState('title-asc'); // 'title-asc', 'title-desc', 'date-new', 'date-old'
   
@@ -35,7 +41,8 @@ export default function App() {
   
   const [form, setForm] = useState({ 
     title: '', 
-    category: '', 
+    category: 'Main Dish', 
+    tags: [],
     ingredients: '', 
     instructions: '', 
     prepTime: '', 
@@ -55,7 +62,17 @@ export default function App() {
       const stored = await AsyncStorage.getItem('recipes');
       if (stored) {
         const parsed = JSON.parse(stored);
-        setRecipes(Array.isArray(parsed) ? parsed : []);
+        // Migration: add default category and tags to existing recipes
+        const migrated = (Array.isArray(parsed) ? parsed : []).map(recipe => ({
+          ...recipe,
+          category: recipe.category || 'Main Dish',
+          tags: Array.isArray(recipe.tags) ? recipe.tags : [],
+        }));
+        setRecipes(migrated);
+        // Save migrated data back if any changes were made
+        if (JSON.stringify(parsed) !== JSON.stringify(migrated)) {
+          await AsyncStorage.setItem('recipes', JSON.stringify(migrated));
+        }
       }
     } catch (error) {
       console.error('Error loading recipes:', error);
@@ -100,7 +117,8 @@ export default function App() {
     const newRecipe = {
       id: String(Date.now()),
       title: String(form.title),
-      category: String(form.category),
+      category: String(form.category || 'Main Dish'),
+      tags: Array.isArray(form.tags) ? form.tags : [],
       ingredients: String(form.ingredients),
       instructions: String(form.instructions),
       prepTime: String(form.prepTime),
@@ -123,7 +141,8 @@ export default function App() {
         ? {
             id: String(selectedRecipe.id),
             title: String(form.title),
-            category: String(form.category),
+            category: String(form.category || 'Main Dish'),
+            tags: Array.isArray(form.tags) ? form.tags : [],
             ingredients: String(form.ingredients),
             instructions: String(form.instructions),
             prepTime: String(form.prepTime),
@@ -153,7 +172,7 @@ export default function App() {
   };
 
   const resetForm = () => {
-    setForm({ title: '', category: '', ingredients: '', instructions: '', prepTime: '', cookTime: '', imageUri: '', videoUrl: '' });
+    setForm({ title: '', category: 'Main Dish', tags: [], ingredients: '', instructions: '', prepTime: '', cookTime: '', imageUri: '', videoUrl: '' });
     setSelectedRecipe(null);
   };
 
@@ -182,6 +201,11 @@ export default function App() {
   // Search and filter logic
   const getFilteredRecipes = () => {
     let filtered = [...recipes];
+
+    // Apply category filter
+    if (filters.category && filters.category !== 'All') {
+      filtered = filtered.filter(recipe => recipe.category === filters.category);
+    }
 
     // Apply search
     if (searchQuery.trim()) {
@@ -1093,6 +1117,45 @@ export default function App() {
           )}
         </View>
 
+        {/* Category Filter Buttons */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryFilterContainer}
+        >
+          <TouchableOpacity
+            style={[
+              styles.categoryFilterButton,
+              filters.category === 'All' && styles.categoryFilterButtonActive
+            ]}
+            onPress={() => setFilters({ ...filters, category: 'All' })}
+          >
+            <Text style={[
+              styles.categoryFilterButtonText,
+              filters.category === 'All' && styles.categoryFilterButtonTextActive
+            ]}>
+              All
+            </Text>
+          </TouchableOpacity>
+          {CATEGORIES.map(cat => (
+            <TouchableOpacity
+              key={cat}
+              style={[
+                styles.categoryFilterButton,
+                filters.category === cat && styles.categoryFilterButtonActive
+              ]}
+              onPress={() => setFilters({ ...filters, category: cat })}
+            >
+              <Text style={[
+                styles.categoryFilterButtonText,
+                filters.category === cat && styles.categoryFilterButtonTextActive
+              ]}>
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         {/* Filter/Sort Bar */}
         <View style={styles.filterBar}>
           <TouchableOpacity
@@ -1145,7 +1208,9 @@ export default function App() {
               ) : null}
               <View style={styles.recipeInfo}>
                 <Text style={styles.recipeTitle}>{item.title}</Text>
-                <Text style={styles.recipeCategory}>{item.category || 'No category'}</Text>
+                <View style={styles.categoryBadge}>
+                  <Text style={styles.categoryBadgeText}>{item.category || 'Main Dish'}</Text>
+                </View>
                 <View style={styles.recipeMetadata}>
                   {item.prepTime && <Text style={styles.timeText}>⏱️ {item.prepTime}</Text>}
                   {item.cookTime && <Text style={styles.timeText}>🔥 {item.cookTime}</Text>}
@@ -1381,12 +1446,46 @@ export default function App() {
           value={form.title}
           onChangeText={(text) => setForm({ ...form, title: text })}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Category"
-          value={form.category}
-          onChangeText={(text) => setForm({ ...form, category: text })}
-        />
+        
+        <Text style={styles.label}>Category</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={form.category}
+            onValueChange={(value) => setForm({ ...form, category: value })}
+            style={styles.picker}
+          >
+            {CATEGORIES.map(cat => (
+              <Picker.Item key={cat} label={cat} value={cat} />
+            ))}
+          </Picker>
+        </View>
+        
+        <Text style={styles.label}>Tags (Optional)</Text>
+        <View style={styles.tagsContainer}>
+          {TAGS.map(tag => (
+            <TouchableOpacity
+              key={tag}
+              style={[
+                styles.tagChip,
+                form.tags.includes(tag) && styles.tagChipSelected
+              ]}
+              onPress={() => {
+                const newTags = form.tags.includes(tag)
+                  ? form.tags.filter(t => t !== tag)
+                  : [...form.tags, tag];
+                setForm({ ...form, tags: newTags });
+              }}
+            >
+              <Text style={[
+                styles.tagChipText,
+                form.tags.includes(tag) && styles.tagChipTextSelected
+              ]}>
+                {tag}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        
         <TextInput
           style={[styles.input, { height: 80 }]}
           placeholder="Ingredients"
@@ -1531,7 +1630,26 @@ export default function App() {
           </TouchableOpacity>
         ) : null}
         
-        <Text style={styles.detail}>Category: {selectedRecipe.category}</Text>
+        <View style={styles.detailSection}>
+          <Text style={styles.detailLabel}>Category:</Text>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryBadgeText}>{selectedRecipe.category || 'Main Dish'}</Text>
+          </View>
+        </View>
+        
+        {selectedRecipe.tags && selectedRecipe.tags.length > 0 && (
+          <View style={styles.detailSection}>
+            <Text style={styles.detailLabel}>Tags:</Text>
+            <View style={styles.tagsContainer}>
+              {selectedRecipe.tags.map(tag => (
+                <View key={tag} style={styles.tagChipDisplay}>
+                  <Text style={styles.tagChipDisplayText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+        
         <Text style={styles.detail}>Prep: {selectedRecipe.prepTime}</Text>
         <Text style={styles.detail}>Cook: {selectedRecipe.cookTime}</Text>
 
@@ -1553,7 +1671,8 @@ export default function App() {
           onPress={() => {
             setForm({
               title: selectedRecipe.title,
-              category: selectedRecipe.category,
+              category: selectedRecipe.category || 'Main Dish',
+              tags: Array.isArray(selectedRecipe.tags) ? selectedRecipe.tags : [],
               ingredients: selectedRecipe.ingredients,
               instructions: selectedRecipe.instructions,
               prepTime: selectedRecipe.prepTime,
@@ -1669,12 +1788,46 @@ export default function App() {
           value={form.title}
           onChangeText={(text) => setForm({ ...form, title: text })}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Category"
-          value={form.category}
-          onChangeText={(text) => setForm({ ...form, category: text })}
-        />
+        
+        <Text style={styles.label}>Category</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={form.category}
+            onValueChange={(value) => setForm({ ...form, category: value })}
+            style={styles.picker}
+          >
+            {CATEGORIES.map(cat => (
+              <Picker.Item key={cat} label={cat} value={cat} />
+            ))}
+          </Picker>
+        </View>
+        
+        <Text style={styles.label}>Tags (Optional)</Text>
+        <View style={styles.tagsContainer}>
+          {TAGS.map(tag => (
+            <TouchableOpacity
+              key={tag}
+              style={[
+                styles.tagChip,
+                form.tags.includes(tag) && styles.tagChipSelected
+              ]}
+              onPress={() => {
+                const newTags = form.tags.includes(tag)
+                  ? form.tags.filter(t => t !== tag)
+                  : [...form.tags, tag];
+                setForm({ ...form, tags: newTags });
+              }}
+            >
+              <Text style={[
+                styles.tagChipText,
+                form.tags.includes(tag) && styles.tagChipTextSelected
+              ]}>
+                {tag}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        
         <TextInput
           style={[styles.input, { height: 80 }]}
           placeholder="Ingredients"
@@ -2155,5 +2308,113 @@ const styles = StyleSheet.create({
   deleteItemText: {
     fontSize: 20,
     color: '#d32f2f',
+  },
+  // Category and Tags styles
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 6,
+    marginTop: 10,
+    marginLeft: 4,
+  },
+  pickerContainer: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  picker: {
+    height: 50,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 10,
+  },
+  tagChip: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  tagChipSelected: {
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
+  },
+  tagChipText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  tagChipTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  tagChipDisplay: {
+    backgroundColor: '#e3f2fd',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  tagChipDisplayText: {
+    fontSize: 12,
+    color: '#1976D2',
+  },
+  categoryFilterContainer: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    maxHeight: 44,
+  },
+  categoryFilterButton: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  categoryFilterButtonActive: {
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
+  },
+  categoryFilterButtonText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  categoryFilterButtonTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  categoryBadge: {
+    backgroundColor: '#e3f2fd',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  categoryBadgeText: {
+    fontSize: 12,
+    color: '#1976D2',
+    fontWeight: '600',
+  },
+  detailSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  detailLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginRight: 10,
   },
 });
