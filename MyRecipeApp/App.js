@@ -17,6 +17,9 @@ export default function App() {
   const [importText, setImportText] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [recipeToDelete, setRecipeToDelete] = useState(null);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateRecipeTitle, setDuplicateRecipeTitle] = useState('');
   
   // Search and Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -262,6 +265,42 @@ export default function App() {
     const line = ingredientLine.trim();
     if (!line) return null;
 
+    // Skip section headers (lines ending with colon, or starting with "For")
+    if (line.endsWith(':') || /^For (the|a|an)\s/i.test(line)) {
+      return null;
+    }
+
+    // Handle combined ingredients like "salt and pepper"
+    if (line.toLowerCase().includes(' and ')) {
+      const parts = line.split(/\s+and\s+/i);
+      if (parts.length === 2) {
+        // Check if it's something like "1 salt and pepper" or "salt and pepper"
+        const firstPart = parts[0].trim();
+        const secondPart = parts[1].trim();
+        
+        // Check if first part has just a number
+        const numberMatch = firstPart.match(/^(\d+)\s+(.+)$/);
+        if (numberMatch) {
+          const quantity = parseFloat(numberMatch[1]);
+          const firstIngredient = numberMatch[2].trim();
+          
+          // Return array of two ingredients with same quantity
+          return [
+            { ingredient: firstIngredient, quantity: quantity, unit: '' },
+            { ingredient: secondPart, quantity: quantity, unit: '' }
+          ];
+        }
+        
+        // Check if entire thing is "salt and pepper" (no quantity)
+        if (!firstPart.match(/\d/) && !secondPart.match(/\d/)) {
+          return [
+            { ingredient: firstPart, quantity: 1, unit: '' },
+            { ingredient: secondPart, quantity: 1, unit: '' }
+          ];
+        }
+      }
+    }
+
     // Common units to match
     const units = ['cup', 'cups', 'tablespoon', 'tablespoons', 'tbsp', 'teaspoon', 'teaspoons', 'tsp', 
                    'ounce', 'ounces', 'oz', 'pound', 'pounds', 'lb', 'lbs', 'gram', 'grams', 'g', 
@@ -294,7 +333,11 @@ export default function App() {
       
       if (isUnit) {
         const unit = normalizeUnit(firstWord);
-        const ingredient = remainderParts.slice(1).join(' ');
+        let ingredient = remainderParts.slice(1).join(' ');
+        
+        // Clean up ingredient name
+        ingredient = cleanIngredientName(ingredient);
+        
         return {
           ingredient: ingredient || firstWord,
           quantity: quantity,
@@ -302,8 +345,11 @@ export default function App() {
         };
       } else {
         // No unit, remainder is all ingredient
+        let ingredient = remainder.trim();
+        ingredient = cleanIngredientName(ingredient);
+        
         return {
-          ingredient: remainder.trim(),
+          ingredient: ingredient,
           quantity: quantity,
           unit: '',
         };
@@ -312,10 +358,243 @@ export default function App() {
     
     // If no match, treat entire line as ingredient with quantity 1
     return {
-      ingredient: line,
+      ingredient: cleanIngredientName(line),
       quantity: 1,
       unit: '',
     };
+  };
+
+  // Helper function to clean ingredient names for better aggregation
+  const cleanIngredientName = (name) => {
+    if (!name) return '';
+    
+    // Remove parenthetical notes (e.g., "about 3 large eggs", "room temperature")
+    name = name.replace(/\([^)]*\)/g, '').trim();
+    
+    // Remove preparation notes after commas (e.g., "sifted", "chopped", "minced")
+    name = name.replace(/,\s*(sifted|chopped|minced|diced|sliced|cubed|finely chopped|at room temperature|softened|melted|beaten|whisked).*$/i, '').trim();
+    
+    // Remove common trailing preparation phrases
+    name = name.replace(/\s+(at room temperature|room temperature|softened|melted|beaten|whisked|finely chopped|chopped|minced|diced|sliced)$/i, '').trim();
+    
+    return name;
+  };
+
+  // Normalize ingredient names to base forms for better aggregation
+  const normalizeIngredientForAggregation = (parsed) => {
+    if (!parsed) return null;
+    
+    let { ingredient, quantity, unit } = parsed;
+    const lowerIngredient = ingredient.toLowerCase();
+    
+    // Normalize egg-based ingredients to "eggs"
+    if (lowerIngredient.includes('egg white') || lowerIngredient === 'egg whites') {
+      // Approximate conversion: 30-33g egg white ≈ 1 egg white, 2 egg whites ≈ 1 egg
+      if (unit === 'gram' && quantity >= 30) {
+        quantity = Math.ceil(quantity / 60); // ~60g = 1 egg
+      } else if (unit === '') {
+        quantity = Math.ceil(quantity / 2); // 2 whites ≈ 1 egg
+      }
+      ingredient = 'eggs';
+      unit = '';
+    } else if (lowerIngredient.includes('egg yolk') || lowerIngredient === 'egg yolks') {
+      // Approximate conversion: ~18g egg yolk ≈ 1 yolk, 3 yolks ≈ 1 egg
+      if (unit === 'gram' && quantity >= 18) {
+        quantity = Math.ceil(quantity / 54); // ~54g = 1 egg
+      } else if (unit === '') {
+        quantity = Math.ceil(quantity / 3); // 3 yolks ≈ 1 egg
+      }
+      ingredient = 'eggs';
+      unit = '';
+    } else if (lowerIngredient === 'egg' || lowerIngredient === 'eggs' || 
+               lowerIngredient.includes('large egg') || lowerIngredient.includes('whole egg')) {
+      ingredient = 'eggs';
+      unit = '';
+    }
+    
+    // Normalize sugar types
+    if (lowerIngredient.includes('brown sugar')) {
+      ingredient = 'brown sugar';
+      // Convert to grams for aggregation
+      if (unit === 'cup' || unit === 'cups') {
+        quantity = quantity * 220; // 1 cup = 220g
+        unit = 'gram';
+      } else if (unit === 'tablespoon' || unit === 'tbsp') {
+        quantity = quantity * 14; // 1 tbsp = 14g
+        unit = 'gram';
+      } else if (unit === 'teaspoon' || unit === 'tsp') {
+        quantity = quantity * 4.5; // 1 tsp = 4.5g
+        unit = 'gram';
+      } else if (unit === '') {
+        unit = 'gram';
+      }
+    } else if (lowerIngredient.includes('powdered sugar') || lowerIngredient.includes('confectioners') || 
+               lowerIngredient.includes('icing sugar') || lowerIngredient.includes("confectioner's sugar")) {
+      ingredient = 'powdered sugar';
+      // Convert to grams for aggregation
+      if (unit === 'cup' || unit === 'cups') {
+        quantity = quantity * 120; // 1 cup = 120g
+        unit = 'gram';
+      } else if (unit === 'tablespoon' || unit === 'tbsp') {
+        quantity = quantity * 7.5; // 1 tbsp = 7.5g
+        unit = 'gram';
+      } else if (unit === 'teaspoon' || unit === 'tsp') {
+        quantity = quantity * 2.5; // 1 tsp = 2.5g
+        unit = 'gram';
+      } else if (unit === '') {
+        unit = 'gram';
+      }
+    } else if (lowerIngredient.includes('granulated sugar') || lowerIngredient.includes('white sugar') || 
+               lowerIngredient === 'sugar' || lowerIngredient === 'caster sugar') {
+      ingredient = 'sugar';
+      // Convert to grams for aggregation
+      if (unit === 'cup' || unit === 'cups') {
+        quantity = quantity * 200; // 1 cup = 200g
+        unit = 'gram';
+      } else if (unit === 'tablespoon' || unit === 'tbsp') {
+        quantity = quantity * 12.5; // 1 tbsp = 12.5g
+        unit = 'gram';
+      } else if (unit === 'teaspoon' || unit === 'tsp') {
+        quantity = quantity * 4; // 1 tsp = 4g
+        unit = 'gram';
+      } else if (unit === '') {
+        unit = 'gram';
+      }
+    }
+    
+    // Normalize butter
+    if (lowerIngredient.includes('butter') && !lowerIngredient.includes('peanut') && !lowerIngredient.includes('almond')) {
+      ingredient = 'butter';
+      // Convert stick/ounce to grams for aggregation
+      if (unit === '' || unit === 'stick' || unit === 'sticks') {
+        quantity = quantity * 113; // 1 stick = 113g (4 oz)
+        unit = 'gram';
+      } else if (unit === 'ounce' || unit === 'oz') {
+        quantity = quantity * 28.35; // 1 oz = 28.35g
+        unit = 'gram';
+      } else if (unit === 'pound' || unit === 'lb') {
+        quantity = quantity * 453.6; // 1 lb = 453.6g
+        unit = 'gram';
+      }
+    }
+    
+    // Normalize flour types
+    if (lowerIngredient.includes('all-purpose flour') || lowerIngredient.includes('all purpose flour')) {
+      ingredient = 'all-purpose flour';
+      // Convert to grams for aggregation
+      if (unit === 'cup' || unit === 'cups') {
+        quantity = quantity * 125; // 1 cup = 125g
+        unit = 'gram';
+      } else if (unit === 'tablespoon' || unit === 'tbsp') {
+        quantity = quantity * 8; // 1 tbsp = 8g
+        unit = 'gram';
+      } else if (unit === 'teaspoon' || unit === 'tsp') {
+        quantity = quantity * 2.6; // 1 tsp = 2.6g
+        unit = 'gram';
+      } else if (unit === '' || unit === 'ounce' || unit === 'oz') {
+        if (unit === 'ounce' || unit === 'oz') {
+          quantity = quantity * 28.35;
+        }
+        unit = 'gram';
+      }
+    } else if (lowerIngredient.includes('flour') && !lowerIngredient.includes('almond')) {
+      ingredient = 'flour';
+      // Convert to grams for aggregation
+      if (unit === 'cup' || unit === 'cups') {
+        quantity = quantity * 125; // 1 cup = 125g
+        unit = 'gram';
+      } else if (unit === 'tablespoon' || unit === 'tbsp') {
+        quantity = quantity * 8; // 1 tbsp = 8g
+        unit = 'gram';
+      } else if (unit === 'teaspoon' || unit === 'tsp') {
+        quantity = quantity * 2.6; // 1 tsp = 2.6g
+        unit = 'gram';
+      } else if (unit === '' || unit === 'ounce' || unit === 'oz') {
+        if (unit === 'ounce' || unit === 'oz') {
+          quantity = quantity * 28.35;
+        }
+        unit = 'gram';
+      }
+    }
+    
+    // Normalize salt types
+    if (lowerIngredient === 'salt' || lowerIngredient.includes('sea salt') || 
+        lowerIngredient.includes('kosher salt') || lowerIngredient.includes('table salt') ||
+        lowerIngredient.includes('fine salt') || lowerIngredient.includes('coarse salt') ||
+        lowerIngredient === 'of salt' || lowerIngredient.endsWith(' salt')) {
+      ingredient = 'salt';
+      // Convert pinch/dash to teaspoons for aggregation
+      if (unit === 'pinch' || unit === 'dash') {
+        quantity = quantity * 0.0625; // 1 pinch ≈ 1/16 teaspoon
+        unit = 'teaspoon';
+      } else if (unit === '') {
+        unit = 'teaspoon';
+      }
+    }
+    
+    // Normalize garlic
+    if (lowerIngredient === 'garlic' || lowerIngredient === 'garlic clove' || 
+        lowerIngredient === 'garlic cloves' || lowerIngredient.includes('clove of garlic') ||
+        lowerIngredient.includes('cloves of garlic') || lowerIngredient === 'of garlic' ||
+        lowerIngredient.endsWith(' garlic')) {
+      ingredient = 'garlic';
+      // Normalize unit to clove
+      if (unit === 'cloves' || unit === 'clove') {
+        unit = 'clove';
+      } else if (unit === '') {
+        unit = 'clove';
+      }
+    }
+    
+    // Normalize pepper
+    if (lowerIngredient === 'black pepper' || lowerIngredient === 'pepper' ||
+        lowerIngredient.includes('ground black pepper') || lowerIngredient.includes('freshly ground pepper') ||
+        lowerIngredient === 'of pepper' || lowerIngredient === 'of black pepper' ||
+        lowerIngredient.endsWith(' pepper') || lowerIngredient.endsWith(' black pepper')) {
+      ingredient = 'black pepper';
+      // Convert pinch/dash to teaspoons for aggregation
+      if (unit === 'pinch' || unit === 'dash') {
+        quantity = quantity * 0.0625; // 1 pinch ≈ 1/16 teaspoon
+        unit = 'teaspoon';
+      } else if (unit === '') {
+        unit = 'teaspoon';
+      }
+    }
+    
+    // Convert common units to grams for better aggregation
+    const convertedToGrams = convertToGrams(ingredient, quantity, unit);
+    if (convertedToGrams) {
+      quantity = convertedToGrams.quantity;
+      unit = convertedToGrams.unit;
+    }
+    
+    return { ingredient, quantity, unit };
+  };
+
+  // Convert measurements to grams for common ingredients
+  const convertToGrams = (ingredient, quantity, unit) => {
+    if (unit === 'gram' || unit === 'g') {
+      return { quantity, unit: 'gram' };
+    }
+    
+    const lowerIngredient = ingredient.toLowerCase();
+    const conversions = {
+      'powdered sugar': { 'cup': 120, 'tablespoon': 7.5, 'teaspoon': 2.5 },
+      'sugar': { 'cup': 200, 'tablespoon': 12.5, 'teaspoon': 4 },
+      'brown sugar': { 'cup': 220, 'tablespoon': 14, 'teaspoon': 4.5 },
+      'flour': { 'cup': 125, 'tablespoon': 8, 'teaspoon': 2.6 },
+      'all-purpose flour': { 'cup': 125, 'tablespoon': 8, 'teaspoon': 2.6 },
+      'butter': { 'cup': 227, 'tablespoon': 14, 'teaspoon': 4.7 },
+    };
+    
+    // Check if we have a conversion for this ingredient and unit
+    if (conversions[lowerIngredient] && conversions[lowerIngredient][unit]) {
+      const gramsPerUnit = conversions[lowerIngredient][unit];
+      return { quantity: Math.round(quantity * gramsPerUnit), unit: 'gram' };
+    }
+    
+    // If no conversion available, keep original
+    return null;
   };
 
   const addRecipeToShoppingList = (recipe) => {
@@ -324,40 +603,70 @@ export default function App() {
       return;
     }
 
+    // Check if this recipe has already been added to the shopping list
+    const alreadyAdded = shoppingList.some(item => item.recipeIds && item.recipeIds.includes(recipe.id));
+    
+    if (alreadyAdded) {
+      setDuplicateRecipeTitle(recipe.title);
+      setShowDuplicateModal(true);
+      return;
+    }
+
     const ingredientLines = recipe.ingredients.split('\n').filter(line => line.trim());
     const newItems = [];
+    const updatedExistingItems = [...shoppingList]; // Create a copy to track updates
 
     ingredientLines.forEach(line => {
       const parsed = parseIngredient(line);
       if (!parsed) return;
 
-      // Check if ingredient already exists in shopping list
-      const existingIndex = shoppingList.findIndex(item => 
-        item.ingredient.toLowerCase() === parsed.ingredient.toLowerCase() &&
-        item.unit.toLowerCase() === parsed.unit.toLowerCase()
-      );
+      // Handle case where parseIngredient returns an array (for combined ingredients like "salt and pepper")
+      const parsedArray = Array.isArray(parsed) ? parsed : [parsed];
 
-      if (existingIndex >= 0) {
-        // Aggregate quantities
-        const existing = shoppingList[existingIndex];
-        existing.quantity += parsed.quantity;
-        if (!existing.recipeIds.includes(recipe.id)) {
-          existing.recipeIds.push(recipe.id);
+      parsedArray.forEach(item => {
+        // Normalize ingredient for better aggregation
+        const normalized = normalizeIngredientForAggregation(item);
+        if (!normalized) return;
+
+        // Check if ingredient already exists in shopping list
+        const existingIndex = updatedExistingItems.findIndex(existingItem => 
+          existingItem.ingredient.toLowerCase() === normalized.ingredient.toLowerCase() &&
+          existingItem.unit.toLowerCase() === normalized.unit.toLowerCase()
+        );
+
+        if (existingIndex >= 0) {
+          // Aggregate quantities with existing shopping list item
+          updatedExistingItems[existingIndex] = {
+            ...updatedExistingItems[existingIndex],
+            quantity: updatedExistingItems[existingIndex].quantity + normalized.quantity,
+            recipeIds: [...(updatedExistingItems[existingIndex].recipeIds || []), recipe.id]
+          };
+        } else {
+          // Check if ingredient already exists in newItems from this recipe
+          const newItemIndex = newItems.findIndex(newItem =>
+            newItem.ingredient.toLowerCase() === normalized.ingredient.toLowerCase() &&
+            newItem.unit.toLowerCase() === normalized.unit.toLowerCase()
+          );
+
+          if (newItemIndex >= 0) {
+            // Aggregate quantities with existing new item
+            newItems[newItemIndex].quantity += normalized.quantity;
+          } else {
+            // Add new item
+            newItems.push({
+              id: String(Date.now() + Math.random()),
+              ingredient: normalized.ingredient,
+              quantity: normalized.quantity,
+              unit: normalized.unit,
+              checked: false,
+              recipeIds: [recipe.id],
+            });
+          }
         }
-      } else {
-        // Add new item
-        newItems.push({
-          id: String(Date.now() + Math.random()),
-          ingredient: parsed.ingredient,
-          quantity: parsed.quantity,
-          unit: parsed.unit,
-          checked: false,
-          recipeIds: [recipe.id],
-        });
-      }
+      });
     });
 
-    const updatedList = [...shoppingList, ...newItems];
+    const updatedList = [...updatedExistingItems, ...newItems];
     saveShoppingList(updatedList);
     
     Alert.alert(
@@ -380,18 +689,12 @@ export default function App() {
   };
 
   const clearShoppingList = () => {
-    Alert.alert(
-      'Clear Shopping List',
-      'Are you sure you want to clear the entire shopping list?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Clear', 
-          style: 'destructive',
-          onPress: () => saveShoppingList([])
-        }
-      ]
-    );
+    setShowClearModal(true);
+  };
+
+  const confirmClearShoppingList = () => {
+    saveShoppingList([]);
+    setShowClearModal(false);
   };
 
   const shareShoppingList = async () => {
@@ -677,6 +980,65 @@ export default function App() {
         >
           <Text style={styles.buttonText}>Back to Recipes</Text>
         </TouchableOpacity>
+
+        {/* Clear Confirmation Modal */}
+        <Modal
+          visible={showClearModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowClearModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Clear Shopping List</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
+                Are you sure you want to clear the entire shopping list? This action cannot be undone.
+              </Text>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel]} 
+                  onPress={() => setShowClearModal(false)}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#d32f2f' }]} 
+                  onPress={confirmClearShoppingList}
+                >
+                  <Text style={styles.modalButtonText}>Clear All</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Duplicate Recipe Modal */}
+        <Modal
+          visible={showDuplicateModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDuplicateModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Already Added</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
+                "{duplicateRecipeTitle}" has already been added to your shopping list.
+              </Text>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#2196F3' }]} 
+                  onPress={() => setShowDuplicateModal(false)}
+                >
+                  <Text style={styles.modalButtonText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -1120,6 +1482,32 @@ export default function App() {
             </View>
           </View>
         </Modal>
+
+        {/* Duplicate Recipe Modal */}
+        <Modal
+          visible={showDuplicateModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDuplicateModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Already Added</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
+                "{duplicateRecipeTitle}" has already been added to your shopping list.
+              </Text>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#2196F3' }]} 
+                  onPress={() => setShowDuplicateModal(false)}
+                >
+                  <Text style={styles.modalButtonText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     );
   }
@@ -1220,6 +1608,32 @@ export default function App() {
                   onPress={confirmDelete}
                 >
                   <Text style={styles.modalButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Duplicate Recipe Modal */}
+        <Modal
+          visible={showDuplicateModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDuplicateModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Already Added</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
+                "{duplicateRecipeTitle}" has already been added to your shopping list.
+              </Text>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#2196F3' }]} 
+                  onPress={() => setShowDuplicateModal(false)}
+                >
+                  <Text style={styles.modalButtonText}>OK</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1351,6 +1765,32 @@ export default function App() {
                   disabled={!extractionText.trim()}
                 >
                   <Text style={styles.modalButtonText}>Extract</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Duplicate Recipe Modal */}
+        <Modal
+          visible={showDuplicateModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDuplicateModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Already Added</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
+                "{duplicateRecipeTitle}" has already been added to your shopping list.
+              </Text>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#2196F3' }]} 
+                  onPress={() => setShowDuplicateModal(false)}
+                >
+                  <Text style={styles.modalButtonText}>OK</Text>
                 </TouchableOpacity>
               </View>
             </View>
