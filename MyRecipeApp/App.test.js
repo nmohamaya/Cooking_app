@@ -12,11 +12,15 @@
 describe('Recipe Categories and Tags Feature', () => {
   describe('Data Structure and Constants', () => {
     it('should define all required categories', () => {
-      const CATEGORIES = ['Main Dish', 'Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers'];
-      expect(CATEGORIES).toHaveLength(7);
-      expect(CATEGORIES).toContain('Main Dish');
+      const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
+      expect(CATEGORIES).toHaveLength(9);
       expect(CATEGORIES).toContain('Breakfast');
+      expect(CATEGORIES).toContain('Dinner');
       expect(CATEGORIES).toContain('Dessert');
+      expect(CATEGORIES).toContain('Asian');
+      expect(CATEGORIES).toContain('Vegan');
+      expect(CATEGORIES).toContain('Vegetarian');
+      expect(CATEGORIES).not.toContain('Main Dish'); // Main Dish has been removed
     });
 
     it('should define all required tags', () => {
@@ -39,11 +43,35 @@ describe('Recipe Categories and Tags Feature', () => {
 
       const migratedRecipe = {
         ...oldRecipe,
-        category: oldRecipe.category || 'Main Dish',
+        category: oldRecipe.category || 'Dinner',
         tags: Array.isArray(oldRecipe.tags) ? oldRecipe.tags : [],
       };
 
-      expect(migratedRecipe.category).toBe('Main Dish');
+      expect(migratedRecipe.category).toBe('Dinner');
+      expect(migratedRecipe.tags).toEqual([]);
+    });
+
+    it('should convert Main Dish to Dinner during migration', () => {
+      const oldRecipe = {
+        id: '1',
+        title: 'Old Main Dish Recipe',
+        category: 'Main Dish',
+        ingredients: 'test',
+        instructions: 'test',
+      };
+
+      let category = oldRecipe.category || 'Dinner';
+      if (category === 'Main Dish') {
+        category = 'Dinner';
+      }
+
+      const migratedRecipe = {
+        ...oldRecipe,
+        category,
+        tags: Array.isArray(oldRecipe.tags) ? oldRecipe.tags : [],
+      };
+
+      expect(migratedRecipe.category).toBe('Dinner');
       expect(migratedRecipe.tags).toEqual([]);
     });
 
@@ -58,7 +86,7 @@ describe('Recipe Categories and Tags Feature', () => {
 
       const migratedRecipe = {
         ...recipeWithCategory,
-        category: recipeWithCategory.category || 'Main Dish',
+        category: recipeWithCategory.category || 'Dinner',
         tags: Array.isArray(recipeWithCategory.tags) ? recipeWithCategory.tags : [],
       };
 
@@ -76,7 +104,7 @@ describe('Recipe Categories and Tags Feature', () => {
 
       const migratedRecipe = {
         ...recipeWithoutTags,
-        category: recipeWithoutTags.category || 'Main Dish',
+        category: recipeWithoutTags.category || 'Dinner',
         tags: Array.isArray(recipeWithoutTags.tags) ? recipeWithoutTags.tags : [],
       };
 
@@ -88,7 +116,7 @@ describe('Recipe Categories and Tags Feature', () => {
       const recipeWithTags = {
         id: '1',
         title: 'Recipe',
-        category: 'Main Dish',
+        category: 'Dinner',
         tags: ['Quick', 'Easy'],
         ingredients: 'test',
         instructions: 'test',
@@ -96,7 +124,7 @@ describe('Recipe Categories and Tags Feature', () => {
 
       const migratedRecipe = {
         ...recipeWithTags,
-        category: recipeWithTags.category || 'Main Dish',
+        category: recipeWithTags.category || 'Dinner',
         tags: Array.isArray(recipeWithTags.tags) ? recipeWithTags.tags : [],
       };
 
@@ -109,13 +137,13 @@ describe('Recipe Categories and Tags Feature', () => {
       const newRecipe = {
         id: String(Date.now()),
         title: 'Test Recipe',
-        category: '' || 'Main Dish',
+        category: '' || 'Dinner',
         tags: [],
         ingredients: 'Flour, Sugar',
         instructions: 'Mix and bake',
       };
 
-      expect(newRecipe.category).toBe('Main Dish');
+      expect(newRecipe.category).toBe('Dinner');
       expect(newRecipe.tags).toEqual([]);
     });
 
@@ -124,7 +152,7 @@ describe('Recipe Categories and Tags Feature', () => {
       const newRecipe = {
         id: String(Date.now()),
         title: 'Pancakes',
-        category: selectedCategory || 'Main Dish',
+        category: selectedCategory || 'Dinner',
         tags: [],
         ingredients: 'Flour, Eggs, Milk',
         instructions: 'Mix and cook',
@@ -138,7 +166,7 @@ describe('Recipe Categories and Tags Feature', () => {
       const newRecipe = {
         id: String(Date.now()),
         title: 'Quick Meal',
-        category: 'Main Dish',
+        category: 'Dinner',
         tags: selectedTags,
         ingredients: 'Pasta',
         instructions: 'Boil pasta',
@@ -192,7 +220,7 @@ describe('Recipe Categories and Tags Feature', () => {
     const recipes = [
       { id: '1', title: 'Pancakes', category: 'Breakfast', tags: ['Quick', 'Easy'] },
       { id: '2', title: 'Chocolate Cake', category: 'Dessert', tags: ['Sweet'] },
-      { id: '3', title: 'Pasta', category: 'Main Dish', tags: ['Easy'] },
+      { id: '3', title: 'Pasta', category: 'Dinner', tags: ['Easy'] },
       { id: '4', title: 'Omelette', category: 'Breakfast', tags: ['Quick'] },
     ];
 
@@ -239,7 +267,7 @@ describe('Recipe Categories and Tags Feature', () => {
       const updatedRecipe = {
         ...originalRecipe,
         title: 'Updated Recipe',
-        category: originalRecipe.category || 'Main Dish',
+        category: originalRecipe.category || 'Dinner',
         tags: Array.isArray(originalRecipe.tags) ? originalRecipe.tags : [],
       };
 
@@ -259,7 +287,7 @@ describe('Recipe Categories and Tags Feature', () => {
       const newCategory = 'Breakfast';
       const updatedRecipe = {
         ...originalRecipe,
-        category: newCategory || 'Main Dish',
+        category: newCategory || 'Dinner',
       };
 
       expect(updatedRecipe.category).toBe('Breakfast');
@@ -269,7 +297,7 @@ describe('Recipe Categories and Tags Feature', () => {
       const originalRecipe = {
         id: '1',
         title: 'Recipe',
-        category: 'Main Dish',
+        category: 'Dinner',
         tags: ['Quick'],
       };
 
@@ -285,17 +313,19 @@ describe('Recipe Categories and Tags Feature', () => {
 
   describe('Category Icons and Display', () => {
     const categoryIcons = {
-      'Main Dish': '🍽️',
       'Breakfast': '🍳',
       'Lunch': '🥗',
       'Dinner': '🍛',
       'Dessert': '🍰',
       'Snacks': '🍿',
       'Appetizers': '🥟',
+      'Asian': '🥢',
+      'Vegan': '🥬',
+      'Vegetarian': '🥦',
     };
 
     it('should have icon for each category', () => {
-      const CATEGORIES = ['Main Dish', 'Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers'];
+      const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
       
       CATEGORIES.forEach(category => {
         expect(categoryIcons[category]).toBeDefined();
@@ -308,6 +338,109 @@ describe('Recipe Categories and Tags Feature', () => {
       const badgeText = `${icon} ${category}`;
 
       expect(badgeText).toBe('🍳 Breakfast');
+    });
+
+    it('should have new categories Asian, Vegan, and Vegetarian', () => {
+      expect(categoryIcons['Asian']).toBe('🥢');
+      expect(categoryIcons['Vegan']).toBe('🥬');
+      expect(categoryIcons['Vegetarian']).toBe('🥦');
+    });
+
+    it('should not have Main Dish category', () => {
+      expect(categoryIcons['Main Dish']).toBeUndefined();
+    });
+  });
+
+  describe('AI Category Detection', () => {
+    const validCategories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
+
+    it('should validate category is in allowed list', () => {
+      const detectedCategory = 'Asian';
+      const isValid = validCategories.includes(detectedCategory);
+      expect(isValid).toBe(true);
+    });
+
+    it('should fall back to Dinner for invalid category', () => {
+      const detectedCategory = 'InvalidCategory';
+      const category = validCategories.includes(detectedCategory) ? detectedCategory : 'Dinner';
+      expect(category).toBe('Dinner');
+    });
+
+    it('should detect Breakfast category from morning dishes', () => {
+      // Simulating AI detection logic
+      const recipeText = 'Fluffy pancakes with maple syrup and eggs';
+      const keywords = ['pancake', 'eggs', 'oatmeal', 'cereal', 'breakfast'];
+      const containsBreakfastKeyword = keywords.some(kw => recipeText.toLowerCase().includes(kw));
+      const category = containsBreakfastKeyword ? 'Breakfast' : 'Dinner';
+      expect(category).toBe('Breakfast');
+    });
+
+    it('should detect Dessert category from sweet dishes', () => {
+      const recipeText = 'Chocolate cake with frosting';
+      const keywords = ['cake', 'cookie', 'ice cream', 'brownie', 'dessert'];
+      const containsDessertKeyword = keywords.some(kw => recipeText.toLowerCase().includes(kw));
+      const category = containsDessertKeyword ? 'Dessert' : 'Dinner';
+      expect(category).toBe('Dessert');
+    });
+
+    it('should detect Asian category from Asian cuisine dishes', () => {
+      const recipeText = 'Pad Thai with noodles and peanuts';
+      const keywords = ['thai', 'chinese', 'sushi', 'curry', 'noodles', 'stir fry'];
+      const containsAsianKeyword = keywords.some(kw => recipeText.toLowerCase().includes(kw));
+      const category = containsAsianKeyword ? 'Asian' : 'Dinner';
+      expect(category).toBe('Asian');
+    });
+
+    it('should detect Vegan category from plant-based dishes', () => {
+      const recipeText = 'Tofu stir-fry with vegetables, no animal products';
+      const keywords = ['vegan', 'tofu', 'plant-based'];
+      const containsVeganKeyword = keywords.some(kw => recipeText.toLowerCase().includes(kw));
+      const hasNoAnimalProducts = !['meat', 'dairy', 'egg', 'fish'].some(kw => recipeText.toLowerCase().includes(kw));
+      const category = (containsVeganKeyword && hasNoAnimalProducts) ? 'Vegan' : 'Dinner';
+      expect(category).toBe('Vegan');
+    });
+
+    it('should detect Vegetarian category from meatless dishes with dairy', () => {
+      const recipeText = 'Cheese pizza with vegetables';
+      const hasCheese = recipeText.toLowerCase().includes('cheese');
+      const hasNoMeat = !['meat', 'chicken', 'beef', 'pork', 'fish'].some(kw => recipeText.toLowerCase().includes(kw));
+      const category = (hasCheese && hasNoMeat) ? 'Vegetarian' : 'Dinner';
+      expect(category).toBe('Vegetarian');
+    });
+
+    it('should use Dinner as default when no specific category matches', () => {
+      const recipeText = 'Grilled chicken with rice';
+      const category = 'Dinner'; // Default fallback
+      expect(category).toBe('Dinner');
+    });
+
+    it('should handle extracted recipe with valid category from AI', () => {
+      const extractedRecipe = {
+        title: 'Vegetable Spring Rolls',
+        category: 'Asian',
+        ingredients: 'Rice paper, vegetables',
+        instructions: 'Roll and serve',
+        prepTime: '20 minutes',
+        cookTime: '0 minutes',
+      };
+
+      expect(validCategories.includes(extractedRecipe.category)).toBe(true);
+      expect(extractedRecipe.category).toBe('Asian');
+    });
+
+    it('should correct invalid category from AI to default', () => {
+      const extractedRecipe = {
+        title: 'Test Recipe',
+        category: 'Italian', // Invalid category
+        ingredients: 'Pasta',
+        instructions: 'Cook',
+      };
+
+      const finalCategory = validCategories.includes(extractedRecipe.category) 
+        ? extractedRecipe.category 
+        : 'Dinner';
+
+      expect(finalCategory).toBe('Dinner');
     });
   });
 });

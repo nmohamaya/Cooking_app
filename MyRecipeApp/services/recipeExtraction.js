@@ -70,13 +70,24 @@ export const extractRecipeFromTranscript = async (transcript) => {
             role: 'system',
             content: `You are a recipe extraction assistant. Extract recipe information from video transcripts and return it in JSON format with these fields:
 - title: string (recipe name)
-- category: string (cuisine type)
+- category: string (MUST be one of: Breakfast, Lunch, Dinner, Dessert, Snacks, Appetizers, Asian, Vegan, Vegetarian)
 - ingredients: string (newline-separated list)
 - instructions: string (numbered steps)
 - prepTime: string (e.g., "15 minutes")
 - cookTime: string (e.g., "30 minutes")
 
-If any field is not mentioned in the transcript, use empty string. Be concise and clear.`
+For category, analyze the recipe content to determine the best fit:
+- Use "Breakfast" for morning meals (pancakes, eggs, oatmeal, etc.)
+- Use "Lunch" or "Dinner" for main meals
+- Use "Dessert" for sweet dishes (cakes, cookies, ice cream, etc.)
+- Use "Snacks" for light foods (chips, nuts, popcorn, etc.)
+- Use "Appetizers" for starters (dips, finger foods, etc.)
+- Use "Asian" for dishes from Asian cuisines (Chinese, Japanese, Thai, Indian, etc.)
+- Use "Vegan" if the recipe contains NO animal products
+- Use "Vegetarian" if the recipe contains NO meat/fish but may have dairy/eggs
+
+If multiple categories apply, choose the most specific one. If unsure, use "Dinner" as default.
+If any other field is not mentioned, use empty string. Be concise and clear.`
           },
           {
             role: 'user',
@@ -98,10 +109,20 @@ If any field is not mentioned in the transcript, use empty string. Be concise an
     const content = response.data.choices[0].message.content;
     const recipe = JSON.parse(content);
 
+    // Valid categories that match App.js CATEGORIES constant
+    const validCategories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
+    
+    // Validate category or use default
+    let category = String(recipe.category || 'Dinner');
+    if (!validCategories.includes(category)) {
+      console.warn(`Invalid category "${category}" detected, using default "Dinner"`);
+      category = 'Dinner';
+    }
+
     // Validate and normalize the response
     return {
       title: String(recipe.title || ''),
-      category: String(recipe.category || ''),
+      category: category,
       ingredients: String(recipe.ingredients || ''),
       instructions: String(recipe.instructions || ''),
       prepTime: String(recipe.prepTime || ''),

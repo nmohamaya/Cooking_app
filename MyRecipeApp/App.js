@@ -8,7 +8,7 @@ import { extractRecipeFromText } from './services/recipeExtraction';
 import { Picker } from '@react-native-picker/picker';
 
 // Predefined categories and tags
-const CATEGORIES = ['Main Dish', 'Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers'];
+const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
 const TAGS = ['Quick', 'Vegetarian', 'Vegan', 'Spicy', 'Easy', 'Healthy'];
 
 export default function App() {
@@ -41,7 +41,7 @@ export default function App() {
   
   const [form, setForm] = useState({ 
     title: '', 
-    category: 'Main Dish', 
+    category: 'Dinner', 
     tags: [],
     ingredients: '', 
     instructions: '', 
@@ -62,12 +62,19 @@ export default function App() {
       const stored = await AsyncStorage.getItem('recipes');
       if (stored) {
         const parsed = JSON.parse(stored);
-        // Migration: add default category and tags to existing recipes
-        const migrated = (Array.isArray(parsed) ? parsed : []).map(recipe => ({
-          ...recipe,
-          category: recipe.category || 'Main Dish',
-          tags: Array.isArray(recipe.tags) ? recipe.tags : [],
-        }));
+        // Migration: add default category and tags to existing recipes, convert Main Dish to Dinner
+        const migrated = (Array.isArray(parsed) ? parsed : []).map(recipe => {
+          let category = recipe.category || 'Dinner';
+          // Convert deprecated Main Dish category to Dinner
+          if (category === 'Main Dish') {
+            category = 'Dinner';
+          }
+          return {
+            ...recipe,
+            category,
+            tags: Array.isArray(recipe.tags) ? recipe.tags : [],
+          };
+        });
         setRecipes(migrated);
         // Save migrated data back if any changes were made
         if (JSON.stringify(parsed) !== JSON.stringify(migrated)) {
@@ -117,7 +124,7 @@ export default function App() {
     const newRecipe = {
       id: String(Date.now()),
       title: String(form.title),
-      category: String(form.category || 'Main Dish'),
+      category: String(form.category || 'Dinner'),
       tags: Array.isArray(form.tags) ? form.tags : [],
       ingredients: String(form.ingredients),
       instructions: String(form.instructions),
@@ -141,7 +148,7 @@ export default function App() {
         ? {
             id: String(selectedRecipe.id),
             title: String(form.title),
-            category: String(form.category || 'Main Dish'),
+            category: String(form.category || 'Dinner'),
             tags: Array.isArray(form.tags) ? form.tags : [],
             ingredients: String(form.ingredients),
             instructions: String(form.instructions),
@@ -172,7 +179,7 @@ export default function App() {
   };
 
   const resetForm = () => {
-    setForm({ title: '', category: 'Main Dish', tags: [], ingredients: '', instructions: '', prepTime: '', cookTime: '', imageUri: '', videoUrl: '' });
+    setForm({ title: '', category: 'Dinner', tags: [], ingredients: '', instructions: '', prepTime: '', cookTime: '', imageUri: '', videoUrl: '' });
     setSelectedRecipe(null);
   };
 
@@ -1209,7 +1216,7 @@ export default function App() {
               <View style={styles.recipeInfo}>
                 <Text style={styles.recipeTitle}>{item.title}</Text>
                 <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryBadgeText}>{item.category || 'Main Dish'}</Text>
+                  <Text style={styles.categoryBadgeText}>{item.category || 'Dinner'}</Text>
                 </View>
                 <View style={styles.recipeMetadata}>
                   {item.prepTime && <Text style={styles.timeText}>⏱️ {item.prepTime}</Text>}
@@ -1633,7 +1640,7 @@ export default function App() {
         <View style={styles.detailSection}>
           <Text style={styles.detailLabel}>Category:</Text>
           <View style={styles.categoryBadge}>
-            <Text style={styles.categoryBadgeText}>{selectedRecipe.category || 'Main Dish'}</Text>
+            <Text style={styles.categoryBadgeText}>{selectedRecipe.category || 'Dinner'}</Text>
           </View>
         </View>
         
@@ -1671,7 +1678,7 @@ export default function App() {
           onPress={() => {
             setForm({
               title: selectedRecipe.title,
-              category: selectedRecipe.category || 'Main Dish',
+              category: selectedRecipe.category || 'Dinner',
               tags: Array.isArray(selectedRecipe.tags) ? selectedRecipe.tags : [],
               ingredients: selectedRecipe.ingredients,
               instructions: selectedRecipe.instructions,
