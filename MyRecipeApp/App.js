@@ -1219,9 +1219,9 @@ export default function App() {
                   <Text style={styles.categoryBadgeText}>{item.category || 'Dinner'}</Text>
                 </View>
                 <View style={styles.recipeMetadata}>
-                  {item.prepTime && <Text style={styles.timeText}>⏱️ {item.prepTime}</Text>}
-                  {item.cookTime && <Text style={styles.timeText}>🔥 {item.cookTime}</Text>}
-                  {item.videoUrl && <Text style={styles.videoIndicator}>🎥</Text>}
+                  {item.prepTime ? <Text style={styles.timeText}>⏱️ {item.prepTime}</Text> : null}
+                  {item.cookTime ? <Text style={styles.timeText}>🔥 {item.cookTime}</Text> : null}
+                  {item.videoUrl ? <Text style={styles.videoIndicator}>🎥</Text> : null}
                 </View>
               </View>
             </TouchableOpacity>
