@@ -164,14 +164,16 @@ export default function App() {
     if (filters.prepTimeMax !== null) {
       filtered = filtered.filter(recipe => {
         const prepMinutes = parseTimeToMinutes(recipe.prepTime);
-        return prepMinutes > 0 && prepMinutes <= filters.prepTimeMax;
+        // Include recipes with no prep time (0) or prep time within limit
+        return prepMinutes <= filters.prepTimeMax;
       });
     }
 
     if (filters.cookTimeMax !== null) {
       filtered = filtered.filter(recipe => {
         const cookMinutes = parseTimeToMinutes(recipe.cookTime);
-        return cookMinutes > 0 && cookMinutes <= filters.cookTimeMax;
+        // Include recipes with no cook time (0) or cook time within limit
+        return cookMinutes <= filters.cookTimeMax;
       });
     }
 
