@@ -107,11 +107,13 @@ graph TD
     A[1. Create Issue with P0/P1/P2 & Size labels + Set Project Fields] --> B[2. Set Status to 'In Progress' + Verify Priority/Size]
     B --> C[3. Create Branch from main]
     C --> D[4. Code & Commit changes]
-    D --> E[5. Push & Create PR with 'Closes #N']
-    E --> F[6. CI/CD Checks Pass]
-    F --> G[7. Merge PR - Issue auto-closes]
-    G --> H[8. Switch to main & Pull]
-    H --> I[9. Delete local branch]
+    D --> E[4b. Write Tests for new functionality]
+    E --> F[4c. Run tests locally - npm test]
+    F --> G[5. Push & Create PR with 'Closes #N']
+    G --> H[6. CI/CD Checks Pass]
+    H --> I[7. Merge PR - Issue auto-closes]
+    I --> J[8. Switch to main & Pull]
+    J --> K[9. Delete local branch]
 ```
 
 **Priority Labels:**
@@ -191,8 +193,15 @@ git checkout -b feature/issue-N-description
 #### 4. Develop Locally
 - Make **atomic commits** (one logical change per commit)
 - Reference issue in commits: `"feat: add image picker (Issue #5)"`
-- Run tests locally before pushing
+- **Write tests for new functionality** (required for all features)
+- Run tests locally before pushing: `npm test`
 - Pre-commit hooks automatically run tests and security checks
+
+**Testing Requirements:**
+- All new features must include corresponding test cases
+- Tests should cover core functionality, edge cases, and error handling
+- Aim for meaningful test coverage (not just 100% for the sake of it)
+- Tests must pass before creating PR
 
 **Commit Message Convention:**
 ```bash
@@ -209,6 +218,7 @@ chore: update dependencies (Issue #5)
 - **Title:** `"Add feature X (Closes #N)"` or `"Fix bug Y (Closes #N)"`
 - **Body:** Include `"Closes #N"` or `"Fixes #N"` to auto-link and close issue
 - **Description:** Summarize changes, testing status, and screenshots if applicable
+- **Tests Required:** All PRs with new functionality must include tests
 - **Wait:** CI/CD pipeline must pass before merging
 
 **PR Template:**
@@ -221,7 +231,7 @@ Brief description of changes
 - ✅ Feature/fix 2
 
 ## Testing
-- ✅ Tests pass locally
+- ✅ Tests written and pass locally (20/20 tests passing)
 - ✅ Tested on web
 - 🟡 Mobile testing pending
 
