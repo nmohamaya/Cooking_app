@@ -2,14 +2,20 @@ import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/asy
 
 jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
 
-jest.mock('react-native-gesture-handler', () => ({
-  install: jest.fn(),
-  GestureHandlerRootView: ({ children }) => children,
-  PanGestureHandler: ({ children }) => children,
-  TapGestureHandler: ({ children }) => children,
-  State: {},
-  Directions: {},
-}));
+// Only mock if the package is installed
+try {
+  require.resolve('react-native-gesture-handler');
+  jest.mock('react-native-gesture-handler', () => ({
+    install: jest.fn(),
+    GestureHandlerRootView: ({ children }) => children,
+    PanGestureHandler: ({ children }) => children,
+    TapGestureHandler: ({ children }) => children,
+    State: {},
+    Directions: {},
+  }));
+} catch (e) {
+  // Package not installed, skip mock
+}
 
 jest.mock('react-native/Libraries/Interaction/InteractionManager', () => ({
   runAfterInteractions: jest.fn(),
