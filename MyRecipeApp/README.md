@@ -110,10 +110,12 @@ graph TD
     D --> E[4b. Write Tests for new functionality]
     E --> F[4c. Run tests locally - npm test]
     F --> G[5. Push & Create PR with 'Closes #N']
-    G --> H[6. CI/CD Checks Pass]
-    H --> I[7. Merge PR - Issue auto-closes]
-    I --> J[8. Switch to main & Pull]
-    J --> K[9. Delete local branch]
+    G --> H[5b. Set Issue Status to 'In Review']
+    H --> I[6. CI/CD Checks Pass]
+    I --> J[7. Merge PR - Issue auto-closes]
+    J --> K[7b. Issue Status auto-moves to 'Done']
+    K --> L[8. Switch to main & Pull]
+    L --> M[9. Delete local branch]
 ```
 
 **Priority Labels:**
@@ -221,6 +223,11 @@ chore: update dependencies (Issue #5)
 - **Tests Required:** All PRs with new functionality must include tests
 - **Wait:** CI/CD pipeline must pass before merging
 
+**After creating the PR, update issue status:**
+- Go to the issue on GitHub or project board
+- Change status from "In Progress" to "In Review"
+- This indicates the work is complete and awaiting code review/merge
+
 **PR Template:**
 ```markdown
 ## Summary
@@ -245,7 +252,8 @@ Closes #N
 
 #### 7. Merge
 - **Method:** Use "Squash and merge" (keeps main history clean)
-- **Auto-close:** Issue automatically closes and moves to "Done" status when PR is merged
+- **Auto-close:** Issue automatically closes when PR is merged
+- **Status Update:** Issue status automatically moves from "In Review" to "Done"
 - **Branch:** Automatically deleted after merge
 
 #### 8. Post-Merge Cleanup
@@ -260,7 +268,7 @@ git pull origin main
 # Delete your local feature branch
 git branch -d feature/issue-N-description
 
-# Verify issue is closed and in "Done" status on GitHub
+# Verify issue is closed and status shows "Done" on GitHub
 ```
 
 #### 9. If More Work Needed
