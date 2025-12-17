@@ -156,10 +156,16 @@ gh issue create -t "Add ingredient quantity validation" \
   -b "Validate that quantities are positive numbers..." \
   -l "enhancement,P1,size: S"
 
-# Note: After creating the issue, set the Priority and Size fields in the GitHub Project:
+# IMPORTANT: After creating the issue, set the Priority and Size fields in the GitHub Project
+# Option 1: Via GitHub Web UI
 # - Go to the project board
+# - Find your issue
 # - Set Priority field to P0, P1, or P2
 # - Set Size field to XS, S, M, L, or XL
+
+# Option 2: Via GitHub CLI (recommended for automation)
+# Get the project item ID first, then set the fields using GraphQL mutations
+# See the project documentation for field IDs and option IDs
 ```
 
 #### 2. Update Issue Status and Project Fields
