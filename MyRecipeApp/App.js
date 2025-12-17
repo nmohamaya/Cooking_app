@@ -13,6 +13,10 @@ export default function App() {
   const [extracting, setExtracting] = useState(false); // Loading state for extraction
   const [showExtractionModal, setShowExtractionModal] = useState(false);
   const [extractionText, setExtractionText] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [recipeToDelete, setRecipeToDelete] = useState(null);
   
   // Search and Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,16 +136,17 @@ export default function App() {
   };
 
   const deleteRecipe = (id) => {
-    Alert.alert('Delete', 'Are you sure?', [
-      { text: 'Cancel' },
-      {
-        text: 'Delete',
-        onPress: () => {
-          saveRecipes(recipes.filter(r => r.id !== id));
-          setScreen('home');
-        },
-      },
-    ]);
+    setRecipeToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = () => {
+    if (recipeToDelete) {
+      saveRecipes(recipes.filter(r => r.id !== recipeToDelete));
+      setShowDeleteModal(false);
+      setRecipeToDelete(null);
+      setScreen('home');
+    }
   };
 
   const resetForm = () => {
@@ -543,36 +548,52 @@ export default function App() {
 
   // Import recipes from JSON file
   const importRecipes = async () => {
-    Alert.alert(
-      'Import Recipes',
-      'To import recipes, paste the JSON content or use file picker',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Paste JSON',
-          onPress: () => {
-            Alert.prompt(
-              'Import JSON',
-              'Paste your recipe JSON here:',
-              async (text) => {
-                try {
-                  const data = JSON.parse(text);
-                  if (data.recipes && Array.isArray(data.recipes)) {
-                    const imported = data.recipes.filter(r => r.id && r.title);
-                    saveRecipes([...recipes, ...imported]);
-                    Alert.alert('Success', `Imported ${imported.length} recipes!`);
-                  } else {
-                    Alert.alert('Error', 'Invalid format');
-                  }
-                } catch (error) {
-                  Alert.alert('Error', 'Failed to parse JSON');
-                }
-              }
-            );
-          },
-        },
-      ]
-    );
+    // Web: use file input
+    if (typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+            if (data.recipes && Array.isArray(data.recipes)) {
+              const imported = data.recipes.filter(r => r.id && r.title);
+              saveRecipes([...recipes, ...imported]);
+              Alert.alert('Success', `Imported ${imported.length} recipes!`);
+            } else {
+              Alert.alert('Error', 'Invalid format. Expected JSON with "recipes" array.');
+            }
+          } catch (error) {
+            console.error('Import error:', error);
+            Alert.alert('Error', 'Failed to parse JSON file.');
+          }
+        }
+      };
+      input.click();
+    } else {
+      // Mobile: show paste modal
+      setShowImportModal(true);
+    }
+  };
+
+  const performImport = async () => {
+    try {
+      const data = JSON.parse(importText);
+      if (data.recipes && Array.isArray(data.recipes)) {
+        const imported = data.recipes.filter(r => r.id && r.title);
+        saveRecipes([...recipes, ...imported]);
+        Alert.alert('Success', `Imported ${imported.length} recipes!`);
+        setShowImportModal(false);
+        setImportText('');
+      } else {
+        Alert.alert('Error', 'Invalid format. Expected JSON with "recipes" array.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to parse JSON. Please check the format.');
+    }
   };
 
   // Shopping List Screen
@@ -885,6 +906,89 @@ export default function App() {
             </View>
           </View>
         </Modal>
+
+        {/* Import Modal */}
+        <Modal
+          visible={showImportModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowImportModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Import Recipes</Text>
+              <Text style={styles.modalSubtitle}>
+                Paste your exported recipe JSON below:
+              </Text>
+              
+              <TextInput
+                style={styles.modalTextInput}
+                multiline
+                numberOfLines={10}
+                value={importText}
+                onChangeText={setImportText}
+                placeholder='{"version":"1.0","recipes":[...]}'
+                textAlignVertical="top"
+              />
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel]} 
+                  onPress={() => {
+                    setShowImportModal(false);
+                    setImportText('');
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonExtract]} 
+                  onPress={performImport}
+                  disabled={!importText.trim()}
+                >
+                  <Text style={styles.modalButtonText}>Import</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          visible={showDeleteModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDeleteModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Delete Recipe</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
+                Are you sure you want to delete this recipe? This action cannot be undone.
+              </Text>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel]} 
+                  onPress={() => {
+                    setShowDeleteModal(false);
+                    setRecipeToDelete(null);
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#d32f2f' }]} 
+                  onPress={confirmDelete}
+                >
+                  <Text style={styles.modalButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -1085,6 +1189,42 @@ export default function App() {
         <TouchableOpacity style={[styles.button, { backgroundColor: '#666' }]} onPress={() => setScreen('home')}>
           <Text style={styles.buttonText}>Back</Text>
         </TouchableOpacity>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          visible={showDeleteModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDeleteModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Delete Recipe</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
+                Are you sure you want to delete this recipe? This action cannot be undone.
+              </Text>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel]} 
+                  onPress={() => {
+                    setShowDeleteModal(false);
+                    setRecipeToDelete(null);
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#d32f2f' }]} 
+                  onPress={confirmDelete}
+                >
+                  <Text style={styles.modalButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     );
   }
