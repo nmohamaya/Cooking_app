@@ -13,6 +13,16 @@ export default function App() {
   const [extracting, setExtracting] = useState(false); // Loading state for extraction
   const [showExtractionModal, setShowExtractionModal] = useState(false);
   const [extractionText, setExtractionText] = useState('');
+  
+  // Search and Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    prepTimeMax: null, // in minutes
+    cookTimeMax: null, // in minutes
+  });
+  const [sortBy, setSortBy] = useState('title-asc'); // 'title-asc', 'title-desc', 'date-new', 'date-old'
+  
   const [form, setForm] = useState({ 
     title: '', 
     category: '', 
@@ -112,6 +122,90 @@ export default function App() {
   const resetForm = () => {
     setForm({ title: '', category: '', ingredients: '', instructions: '', prepTime: '', cookTime: '', imageUri: '', videoUrl: '' });
     setSelectedRecipe(null);
+  };
+
+  // Helper function to parse time strings (e.g., "15 minutes", "1 hour", "30 min")
+  const parseTimeToMinutes = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
+    const lower = timeStr.toLowerCase();
+    let minutes = 0;
+    
+    // Extract numbers
+    const hourMatch = lower.match(/(\d+)\s*(hour|hr)/);
+    const minMatch = lower.match(/(\d+)\s*(minute|min)/);
+    
+    if (hourMatch) minutes += parseInt(hourMatch[1]) * 60;
+    if (minMatch) minutes += parseInt(minMatch[1]);
+    
+    // If no match but contains a number, assume minutes
+    if (minutes === 0) {
+      const numMatch = timeStr.match(/(\d+)/);
+      if (numMatch) minutes = parseInt(numMatch[1]);
+    }
+    
+    return minutes;
+  };
+
+  // Search and filter logic
+  const getFilteredRecipes = () => {
+    let filtered = [...recipes];
+
+    // Apply search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(recipe =>
+        recipe.title.toLowerCase().includes(query) ||
+        recipe.ingredients.toLowerCase().includes(query) ||
+        recipe.category.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply time filters
+    if (filters.prepTimeMax !== null) {
+      filtered = filtered.filter(recipe => {
+        const prepMinutes = parseTimeToMinutes(recipe.prepTime);
+        // Include recipes with no prep time (0) or prep time within limit
+        return prepMinutes <= filters.prepTimeMax;
+      });
+    }
+
+    if (filters.cookTimeMax !== null) {
+      filtered = filtered.filter(recipe => {
+        const cookMinutes = parseTimeToMinutes(recipe.cookTime);
+        // Include recipes with no cook time (0) or cook time within limit
+        return cookMinutes <= filters.cookTimeMax;
+      });
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'title-asc':
+          return a.title.localeCompare(b.title);
+        case 'title-desc':
+          return b.title.localeCompare(a.title);
+        case 'date-new':
+          return parseInt(b.id) - parseInt(a.id); // Newer first
+        case 'date-old':
+          return parseInt(a.id) - parseInt(b.id); // Older first
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  };
+
+  const clearFilters = () => {
+    setFilters({ prepTimeMax: null, cookTimeMax: null });
+    setSearchQuery('');
+  };
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (filters.prepTimeMax !== null) count++;
+    if (filters.cookTimeMax !== null) count++;
+    return count;
   };
 
   // Pick image from gallery
@@ -255,6 +349,9 @@ export default function App() {
 
   // Home Screen
   if (screen === 'home') {
+    const filteredRecipes = getFilteredRecipes();
+    const activeFilters = getActiveFilterCount();
+
     return (
       <View style={styles.container}>
         <Text style={styles.header}>My Recipes</Text>
@@ -272,8 +369,64 @@ export default function App() {
             <Text style={styles.smallButtonText}>📥 Import</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search recipes, ingredients..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#999"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              style={styles.clearButton}
+              onPress={() => setSearchQuery('')}
+            >
+              <Text style={styles.clearButtonText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Filter/Sort Bar */}
+        <View style={styles.filterBar}>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowFilters(true)}
+          >
+            <Text style={styles.filterButtonText}>
+              🔍 Filters {activeFilters > 0 ? `(${activeFilters})` : ''}
+            </Text>
+          </TouchableOpacity>
+          <View style={styles.sortContainer}>
+            <Text style={styles.sortLabel}>Sort: </Text>
+            <TouchableOpacity
+              onPress={() => {
+                const sortOptions = ['title-asc', 'title-desc', 'date-new', 'date-old'];
+                const currentIndex = sortOptions.indexOf(sortBy);
+                const nextIndex = (currentIndex + 1) % sortOptions.length;
+                setSortBy(sortOptions[nextIndex]);
+              }}
+            >
+              <Text style={styles.sortValue}>
+                {sortBy === 'title-asc' ? 'A-Z' : 
+                 sortBy === 'title-desc' ? 'Z-A' : 
+                 sortBy === 'date-new' ? 'Newest' : 'Oldest'} ▼
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Results count */}
+        {(searchQuery || activeFilters > 0) && (
+          <Text style={styles.resultCount}>
+            {filteredRecipes.length} of {recipes.length} recipes
+          </Text>
+        )}
+
         <FlatList
-          data={recipes}
+          data={filteredRecipes}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -289,12 +442,22 @@ export default function App() {
               <View style={styles.recipeInfo}>
                 <Text style={styles.recipeTitle}>{item.title}</Text>
                 <Text style={styles.recipeCategory}>{item.category || 'No category'}</Text>
-                {item.videoUrl ? <Text style={styles.videoIndicator}>🎥 Has video</Text> : null}
+                <View style={styles.recipeMetadata}>
+                  {item.prepTime && <Text style={styles.timeText}>⏱️ {item.prepTime}</Text>}
+                  {item.cookTime && <Text style={styles.timeText}>🔥 {item.cookTime}</Text>}
+                  {item.videoUrl && <Text style={styles.videoIndicator}>🎥</Text>}
+                </View>
               </View>
             </TouchableOpacity>
           )}
-          ListEmptyComponent={<Text style={styles.emptyText}>No recipes yet</Text>}
-          scrollEnabled={recipes.length > 5}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>
+              {searchQuery || activeFilters > 0 
+                ? 'No recipes match your search' 
+                : 'No recipes yet'}
+            </Text>
+          }
+          scrollEnabled={filteredRecipes.length > 5}
         />
         <TouchableOpacity
           style={styles.button}
@@ -305,6 +468,102 @@ export default function App() {
         >
           <Text style={styles.buttonText}>+ Add Recipe</Text>
         </TouchableOpacity>
+
+        {/* Filter Modal */}
+        <Modal
+          visible={showFilters}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowFilters(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.filterModal}>
+              <Text style={styles.modalTitle}>Filter & Sort Recipes</Text>
+              
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>Max Prep Time (minutes)</Text>
+                <View style={styles.timeFilterRow}>
+                  <TouchableOpacity
+                    style={[styles.timeChip, filters.prepTimeMax === 15 && styles.timeChipActive]}
+                    onPress={() => setFilters({ ...filters, prepTimeMax: 15 })}
+                  >
+                    <Text style={styles.timeChipText}>15 min</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.timeChip, filters.prepTimeMax === 30 && styles.timeChipActive]}
+                    onPress={() => setFilters({ ...filters, prepTimeMax: 30 })}
+                  >
+                    <Text style={styles.timeChipText}>30 min</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.timeChip, filters.prepTimeMax === 60 && styles.timeChipActive]}
+                    onPress={() => setFilters({ ...filters, prepTimeMax: 60 })}
+                  >
+                    <Text style={styles.timeChipText}>1 hour</Text>
+                  </TouchableOpacity>
+                  {filters.prepTimeMax !== null && (
+                    <TouchableOpacity
+                      style={styles.timeChipClear}
+                      onPress={() => setFilters({ ...filters, prepTimeMax: null })}
+                    >
+                      <Text style={styles.timeChipText}>Clear</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>Max Cook Time (minutes)</Text>
+                <View style={styles.timeFilterRow}>
+                  <TouchableOpacity
+                    style={[styles.timeChip, filters.cookTimeMax === 15 && styles.timeChipActive]}
+                    onPress={() => setFilters({ ...filters, cookTimeMax: 15 })}
+                  >
+                    <Text style={styles.timeChipText}>15 min</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.timeChip, filters.cookTimeMax === 30 && styles.timeChipActive]}
+                    onPress={() => setFilters({ ...filters, cookTimeMax: 30 })}
+                  >
+                    <Text style={styles.timeChipText}>30 min</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.timeChip, filters.cookTimeMax === 60 && styles.timeChipActive]}
+                    onPress={() => setFilters({ ...filters, cookTimeMax: 60 })}
+                  >
+                    <Text style={styles.timeChipText}>1 hour</Text>
+                  </TouchableOpacity>
+                  {filters.cookTimeMax !== null && (
+                    <TouchableOpacity
+                      style={styles.timeChipClear}
+                      onPress={() => setFilters({ ...filters, cookTimeMax: null })}
+                    >
+                      <Text style={styles.timeChipText}>Clear</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.clearButton]}
+                  onPress={() => {
+                    clearFilters();
+                    setShowFilters(false);
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Clear All</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.applyButton]}
+                  onPress={() => setShowFilters(false)}
+                >
+                  <Text style={[styles.modalButtonText, styles.applyButtonText]}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -815,5 +1074,125 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // Search & Filter Styles
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  searchInput: {
+    flex: 1,
+    padding: 10,
+    fontSize: 15,
+  },
+  clearButton: {
+    padding: 5,
+  },
+  clearButtonText: {
+    fontSize: 18,
+    color: '#999',
+  },
+  filterBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  filterButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  filterButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sortLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 5,
+  },
+  sortValue: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  resultCount: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  recipeMetadata: {
+    flexDirection: 'row',
+    marginTop: 4,
+    gap: 8,
+  },
+  timeText: {
+    fontSize: 12,
+    color: '#888',
+  },
+  filterModal: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+  },
+  filterSection: {
+    marginBottom: 20,
+  },
+  filterLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: '#333',
+  },
+  timeFilterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timeChip: {
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  timeChipActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  timeChipText: {
+    fontSize: 13,
+    color: '#333',
+  },
+  timeChipClear: {
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e53',
+  },
+  applyButton: {
+    backgroundColor: '#007AFF',
+  },
+  applyButtonText: {
+    color: 'white',
   },
 });
