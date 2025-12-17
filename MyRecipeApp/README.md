@@ -104,7 +104,7 @@ npm run lint
 
 ```mermaid
 graph TD
-    A[1. Create Issue with P0/P1/P2 & Size labels] --> B[2. Set Status to 'In Progress']
+    A[1. Create Issue with P0/P1/P2 & Size labels + Set Project Fields] --> B[2. Set Status to 'In Progress' + Verify Priority/Size]
     B --> C[3. Create Branch from main]
     C --> D[4. Code & Commit changes]
     D --> E[5. Push & Create PR with 'Closes #N']
@@ -142,20 +142,34 @@ graph TD
   - **Priority:** `P0` (critical/blocking), `P1` (high), or `P2` (medium/low)
   - **Size:** `size: XS` (<1h), `size: S` (1-4h), `size: M` (1-2 days), `size: L` (3-5 days), `size: XL` (>1 week)
 - **Assign:** Assign to yourself or team member
-- **Status:** Issue will be in "Todo" status initially
+- **Project Fields:** Set Priority and Size in the project (not just labels)
+- **Status:** Issue will be in "Backlog" status initially
 
 **Example:**
 ```bash
+# Create issue with labels
 gh issue create -t "Add ingredient quantity validation" \
   -b "Validate that quantities are positive numbers..." \
   -l "enhancement,P1,size: S"
+
+# Note: After creating the issue, set the Priority and Size fields in the GitHub Project:
+# - Go to the project board
+# - Set Priority field to P0, P1, or P2
+# - Set Size field to XS, S, M, L, or XL
 ```
 
-#### 2. Update Issue Status to "In Progress"
-**Before creating your branch, mark the issue as "In Progress":**
-- Go to the issue on GitHub
-- Change status from "Todo" to "In Progress"
-- This lets the team know you're actively working on it
+#### 2. Update Issue Status and Project Fields
+**Before creating your branch, update the issue:**
+
+1. **Set Status to "In Progress":**
+   - Go to the issue on GitHub or project board
+   - Change status from "Backlog" to "In Progress"
+   - This lets the team know you're actively working on it
+
+2. **Verify Project Fields (if not set during creation):**
+   - **Priority:** Should be set to P0, P1, or P2
+   - **Size:** Should be set to XS, S, M, L, or XL
+   - These appear in the right sidebar of the issue under the project section
 
 #### 3. Create Branch (REQUIRED)
 **Always branch from `main` before making any changes:**
