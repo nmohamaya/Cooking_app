@@ -15,6 +15,8 @@ export default function App() {
   const [extractionText, setExtractionText] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importText, setImportText] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [recipeToDelete, setRecipeToDelete] = useState(null);
   
   // Search and Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,16 +111,17 @@ export default function App() {
   };
 
   const deleteRecipe = (id) => {
-    Alert.alert('Delete', 'Are you sure?', [
-      { text: 'Cancel' },
-      {
-        text: 'Delete',
-        onPress: () => {
-          saveRecipes(recipes.filter(r => r.id !== id));
-          setScreen('home');
-        },
-      },
-    ]);
+    setRecipeToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = () => {
+    if (recipeToDelete) {
+      saveRecipes(recipes.filter(r => r.id !== recipeToDelete));
+      setShowDeleteModal(false);
+      setRecipeToDelete(null);
+      setScreen('home');
+    }
   };
 
   const resetForm = () => {
@@ -629,6 +632,42 @@ export default function App() {
             </View>
           </View>
         </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          visible={showDeleteModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDeleteModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Delete Recipe</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
+                Are you sure you want to delete this recipe? This action cannot be undone.
+              </Text>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel]} 
+                  onPress={() => {
+                    setShowDeleteModal(false);
+                    setRecipeToDelete(null);
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#d32f2f' }]} 
+                  onPress={confirmDelete}
+                >
+                  <Text style={styles.modalButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -822,6 +861,42 @@ export default function App() {
         <TouchableOpacity style={[styles.button, { backgroundColor: '#666' }]} onPress={() => setScreen('home')}>
           <Text style={styles.buttonText}>Back</Text>
         </TouchableOpacity>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          visible={showDeleteModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDeleteModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Delete Recipe</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
+                Are you sure you want to delete this recipe? This action cannot be undone.
+              </Text>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel]} 
+                  onPress={() => {
+                    setShowDeleteModal(false);
+                    setRecipeToDelete(null);
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#d32f2f' }]} 
+                  onPress={confirmDelete}
+                >
+                  <Text style={styles.modalButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     );
   }
