@@ -23,6 +23,9 @@ export default function App() {
   });
   const [sortBy, setSortBy] = useState('title-asc'); // 'title-asc', 'title-desc', 'date-new', 'date-old'
   
+  // Shopping List state
+  const [shoppingList, setShoppingList] = useState([]); // Array of { ingredient, quantity, unit, checked, recipeIds }
+  
   const [form, setForm] = useState({ 
     title: '', 
     category: '', 
@@ -34,9 +37,10 @@ export default function App() {
     videoUrl: ''
   });
 
-  // Load recipes on mount
+  // Load recipes and shopping list on mount
   useEffect(() => {
     loadRecipes();
+    loadShoppingList();
   }, []);
 
   const loadRecipes = async () => {
@@ -57,6 +61,27 @@ export default function App() {
       setRecipes(newRecipes);
     } catch (error) {
       console.error('Error saving recipes:', error);
+    }
+  };
+
+  const loadShoppingList = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('shoppingList');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setShoppingList(Array.isArray(parsed) ? parsed : []);
+      }
+    } catch (error) {
+      console.error('Error loading shopping list:', error);
+    }
+  };
+
+  const saveShoppingList = async (newList) => {
+    try {
+      await AsyncStorage.setItem('shoppingList', JSON.stringify(newList));
+      setShoppingList(newList);
+    } catch (error) {
+      console.error('Error saving shopping list:', error);
     }
   };
 
@@ -208,6 +233,209 @@ export default function App() {
     return count;
   };
 
+  // Shopping List Functions
+  const normalizeUnit = (unit) => {
+    if (!unit) return '';
+    const lower = unit.toLowerCase();
+    // Normalize plural forms
+    const unitMap = {
+      'cups': 'cup', 'tablespoons': 'tablespoon', 'tbsp': 'tablespoon',
+      'teaspoons': 'teaspoon', 'tsp': 'teaspoon',
+      'ounces': 'ounce', 'oz': 'ounce',
+      'pounds': 'pound', 'lbs': 'pound', 'lb': 'pound',
+      'grams': 'gram', 'g': 'gram',
+      'kilograms': 'kilogram', 'kg': 'kilogram',
+      'milliliters': 'milliliter', 'ml': 'milliliter',
+      'liters': 'liter', 'l': 'liter',
+      'cloves': 'clove', 'pieces': 'piece', 'slices': 'slice'
+    };
+    return unitMap[lower] || lower;
+  };
+
+  const parseIngredient = (ingredientLine) => {
+    // Parse ingredient line into quantity, unit, and ingredient
+    const line = ingredientLine.trim();
+    if (!line) return null;
+
+    // Common units to match
+    const units = ['cup', 'cups', 'tablespoon', 'tablespoons', 'tbsp', 'teaspoon', 'teaspoons', 'tsp', 
+                   'ounce', 'ounces', 'oz', 'pound', 'pounds', 'lb', 'lbs', 'gram', 'grams', 'g', 
+                   'kilogram', 'kilograms', 'kg', 'milliliter', 'milliliters', 'ml', 'liter', 'liters', 'l',
+                   'clove', 'cloves', 'piece', 'pieces', 'slice', 'slices', 'pinch', 'dash',
+                   'large', 'medium', 'small'];
+    
+    // Try to match numbers and fractions at the start
+    const numberPattern = /^(\d+)?\s*(\d+\/\d+)?\s+(.+)$/;
+    const match = line.match(numberPattern);
+    
+    if (match) {
+      const [, whole, fraction, remainder] = match;
+      let quantity = 0;
+      
+      // Parse quantity
+      if (whole) quantity += parseFloat(whole);
+      if (fraction) {
+        const [num, den] = fraction.split('/').map(Number);
+        if (num && den) quantity += num / den;
+      }
+      
+      // If no quantity found, set to 1
+      if (!whole && !fraction) quantity = 1;
+      
+      // Now parse remainder for unit and ingredient
+      const remainderParts = remainder.trim().split(/\s+/);
+      const firstWord = remainderParts[0];
+      const isUnit = firstWord && units.some(u => u.toLowerCase() === firstWord.toLowerCase());
+      
+      if (isUnit) {
+        const unit = normalizeUnit(firstWord);
+        const ingredient = remainderParts.slice(1).join(' ');
+        return {
+          ingredient: ingredient || firstWord,
+          quantity: quantity,
+          unit: unit,
+        };
+      } else {
+        // No unit, remainder is all ingredient
+        return {
+          ingredient: remainder.trim(),
+          quantity: quantity,
+          unit: '',
+        };
+      }
+    }
+    
+    // If no match, treat entire line as ingredient with quantity 1
+    return {
+      ingredient: line,
+      quantity: 1,
+      unit: '',
+    };
+  };
+
+  const addRecipeToShoppingList = (recipe) => {
+    if (!recipe.ingredients) {
+      Alert.alert('No Ingredients', 'This recipe has no ingredients to add.');
+      return;
+    }
+
+    const ingredientLines = recipe.ingredients.split('\n').filter(line => line.trim());
+    const newItems = [];
+
+    ingredientLines.forEach(line => {
+      const parsed = parseIngredient(line);
+      if (!parsed) return;
+
+      // Check if ingredient already exists in shopping list
+      const existingIndex = shoppingList.findIndex(item => 
+        item.ingredient.toLowerCase() === parsed.ingredient.toLowerCase() &&
+        item.unit.toLowerCase() === parsed.unit.toLowerCase()
+      );
+
+      if (existingIndex >= 0) {
+        // Aggregate quantities
+        const existing = shoppingList[existingIndex];
+        existing.quantity += parsed.quantity;
+        if (!existing.recipeIds.includes(recipe.id)) {
+          existing.recipeIds.push(recipe.id);
+        }
+      } else {
+        // Add new item
+        newItems.push({
+          id: String(Date.now() + Math.random()),
+          ingredient: parsed.ingredient,
+          quantity: parsed.quantity,
+          unit: parsed.unit,
+          checked: false,
+          recipeIds: [recipe.id],
+        });
+      }
+    });
+
+    const updatedList = [...shoppingList, ...newItems];
+    saveShoppingList(updatedList);
+    
+    Alert.alert(
+      'Added to Shopping List',
+      `Added ${newItems.length} items from "${recipe.title}"`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const toggleShoppingItem = (itemId) => {
+    const updated = shoppingList.map(item =>
+      item.id === itemId ? { ...item, checked: !item.checked } : item
+    );
+    saveShoppingList(updated);
+  };
+
+  const removeShoppingItem = (itemId) => {
+    const updated = shoppingList.filter(item => item.id !== itemId);
+    saveShoppingList(updated);
+  };
+
+  const clearShoppingList = () => {
+    Alert.alert(
+      'Clear Shopping List',
+      'Are you sure you want to clear the entire shopping list?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Clear', 
+          style: 'destructive',
+          onPress: () => saveShoppingList([])
+        }
+      ]
+    );
+  };
+
+  const shareShoppingList = async () => {
+    if (shoppingList.length === 0) {
+      Alert.alert('Empty List', 'Add some items to your shopping list first!');
+      return;
+    }
+
+    const unchecked = shoppingList.filter(item => !item.checked);
+    const checked = shoppingList.filter(item => item.checked);
+    
+    let text = '🛒 Shopping List\n\n';
+    
+    if (unchecked.length > 0) {
+      text += '📋 To Buy:\n';
+      unchecked.forEach(item => {
+        const qty = item.quantity ? `${item.quantity} ${item.unit} `.trim() + ' ' : '';
+        text += `☐ ${qty}${item.ingredient}\n`;
+      });
+    }
+    
+    if (checked.length > 0) {
+      text += '\n✅ Checked Off:\n';
+      checked.forEach(item => {
+        const qty = item.quantity ? `${item.quantity} ${item.unit} `.trim() + ' ' : '';
+        text += `☑ ${qty}${item.ingredient}\n`;
+      });
+    }
+    
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        // Web Share API
+        await navigator.share({ text, title: 'Shopping List' });
+      } else if (typeof document !== 'undefined') {
+        // Web fallback - copy to clipboard
+        await navigator.clipboard.writeText(text);
+        Alert.alert('Copied!', 'Shopping list copied to clipboard');
+      } else {
+        // Mobile - use Sharing
+        const fileUri = FileSystem.documentDirectory + 'shopping_list.txt';
+        await FileSystem.writeAsStringAsync(fileUri, text);
+        await Sharing.shareAsync(fileUri);
+      }
+    } catch (error) {
+      console.error('Share error:', error);
+      Alert.alert('Share Failed', 'Could not share shopping list');
+    }
+  };
+
   // Pick image from gallery
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -347,6 +575,91 @@ export default function App() {
     );
   };
 
+  // Shopping List Screen
+  if (screen === 'shopping') {
+    const uncheckedItems = shoppingList.filter(item => !item.checked);
+    const checkedItems = shoppingList.filter(item => item.checked);
+
+    return (
+      <View style={styles.container}>
+        <Text style={styles.header}>Shopping List</Text>
+        
+        {shoppingList.length === 0 ? (
+          <Text style={styles.emptyText}>
+            Your shopping list is empty.{'\n'}
+            Add ingredients from recipe details!
+          </Text>
+        ) : (
+          <>
+            <View style={styles.headerButtons}>
+              <TouchableOpacity 
+                style={[styles.smallButton, { backgroundColor: '#4CAF50', marginRight: 8 }]}
+                onPress={shareShoppingList}
+              >
+                <Text style={styles.smallButtonText}>📤 Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.smallButton, { backgroundColor: '#d32f2f' }]}
+                onPress={clearShoppingList}
+              >
+                <Text style={styles.smallButtonText}>🗑️ Clear</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.shoppingListSummary}>
+              {uncheckedItems.length} items to buy, {checkedItems.length} checked off
+            </Text>
+
+            <FlatList
+              data={shoppingList}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.shoppingItem}>
+                  <TouchableOpacity
+                    style={styles.checkbox}
+                    onPress={() => toggleShoppingItem(item.id)}
+                  >
+                    <Text style={styles.checkboxText}>
+                      {item.checked ? '☑' : '☐'}
+                    </Text>
+                  </TouchableOpacity>
+                  <View style={styles.shoppingItemContent}>
+                    <Text style={[
+                      styles.shoppingItemText,
+                      item.checked && styles.shoppingItemChecked
+                    ]}>
+                      {item.quantity > 0 && `${item.quantity} `}
+                      {item.unit && `${item.unit} `}
+                      {item.ingredient}
+                    </Text>
+                    {item.recipeIds.length > 1 && (
+                      <Text style={styles.shoppingItemRecipes}>
+                        From {item.recipeIds.length} recipes
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deleteItemButton}
+                    onPress={() => removeShoppingItem(item.id)}
+                  >
+                    <Text style={styles.deleteItemText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+          </>
+        )}
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: '#666' }]}
+          onPress={() => setScreen('home')}
+        >
+          <Text style={styles.buttonText}>Back to Recipes</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   // Home Screen
   if (screen === 'home') {
     const filteredRecipes = getFilteredRecipes();
@@ -356,6 +669,14 @@ export default function App() {
       <View style={styles.container}>
         <Text style={styles.header}>My Recipes</Text>
         <View style={styles.headerButtons}>
+          <TouchableOpacity 
+            style={[styles.smallButton, { marginRight: 8, backgroundColor: '#4CAF50' }]}
+            onPress={() => setScreen('shopping')}
+          >
+            <Text style={styles.smallButtonText}>
+              🛒 List {shoppingList.length > 0 ? `(${shoppingList.filter(i => !i.checked).length})` : ''}
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.smallButton, { marginRight: 8 }]}
             onPress={exportRecipes}
@@ -727,6 +1048,13 @@ export default function App() {
 
         <Text style={styles.subHeader}>Instructions</Text>
         <Text style={styles.detail}>{selectedRecipe.instructions}</Text>
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: '#4CAF50' }]}
+          onPress={() => addRecipeToShoppingList(selectedRecipe)}
+        >
+          <Text style={styles.buttonText}>🛒 Add to Shopping List</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.button}
@@ -1194,5 +1522,58 @@ const styles = StyleSheet.create({
   },
   applyButtonText: {
     color: 'white',
+  },
+  // Shopping List Styles
+  shoppingListSummary: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  shoppingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    padding: 12,
+    marginBottom: 8,
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4CAF50',
+  },
+  checkbox: {
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  checkboxText: {
+    fontSize: 24,
+    color: '#4CAF50',
+  },
+  shoppingItemContent: {
+    flex: 1,
+  },
+  shoppingItemText: {
+    fontSize: 15,
+    color: '#333',
+  },
+  shoppingItemChecked: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+  },
+  shoppingItemRecipes: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  deleteItemButton: {
+    padding: 8,
+  },
+  deleteItemText: {
+    fontSize: 20,
+    color: '#d32f2f',
   },
 });
