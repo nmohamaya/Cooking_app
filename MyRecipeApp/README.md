@@ -134,6 +134,8 @@ graph TD
 
 **ALWAYS create a feature branch before making any code changes.** Direct commits to `main` are not allowed.
 
+**Exception:** Documentation-only changes (typos, formatting, minor clarifications) may be committed directly to main with a `docs:` prefix, but feature documentation should still go through PR process.
+
 ### Development Process
 
 #### 1. Create Issue (REQUIRED BEFORE ANY CODE CHANGES)
