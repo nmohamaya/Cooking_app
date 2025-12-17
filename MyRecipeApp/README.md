@@ -100,19 +100,78 @@ npm run lint
 
 ## Project Workflow
 
+### Complete Development Workflow Summary
+
+```mermaid
+graph TD
+    A[1. Create Issue with P0/P1/P2 & Size labels + Set Project Fields] --> B[2. Set Status to 'In Progress' + Verify Priority/Size]
+    B --> C[3. Create Branch from main]
+    C --> D[4. Code & Commit changes]
+    D --> E[5. Push & Create PR with 'Closes #N']
+    E --> F[6. CI/CD Checks Pass]
+    F --> G[7. Merge PR - Issue auto-closes]
+    G --> H[8. Switch to main & Pull]
+    H --> I[9. Delete local branch]
+```
+
+**Priority Labels:**
+- `P0` - Critical/Blocking (fix immediately)
+- `P1` - High priority (next sprint)
+- `P2` - Medium/Low (backlog)
+
+**Size Labels:**
+- `size: XS` - Less than 1 hour
+- `size: S` - 1-4 hours
+- `size: M` - 1-2 days
+- `size: L` - 3-5 days
+- `size: XL` - More than 1 week
+
 ### ⚠️ IMPORTANT: Never Work Directly on Main Branch
 
 **ALWAYS create a feature branch before making any code changes.** Direct commits to `main` are not allowed.
 
 ### Development Process
 
-#### 1. Create Issue
+#### 1. Create Issue (REQUIRED BEFORE ANY CODE CHANGES)
+**⚠️ Never start coding without creating an issue first!**
+
 - **Title:** Clear, descriptive title
 - **Body:** Detailed requirements and acceptance criteria
-- **Labels:** `enhancement`, `bug`, `security`, `documentation`, or `chore`
+- **Labels:** 
+  - **Type:** `enhancement`, `bug`, `security`, `documentation`, or `chore`
+  - **Priority:** `P0` (critical/blocking), `P1` (high), or `P2` (medium/low)
+  - **Size:** `size: XS` (<1h), `size: S` (1-4h), `size: M` (1-2 days), `size: L` (3-5 days), `size: XL` (>1 week)
 - **Assign:** Assign to yourself or team member
+- **Project Fields:** Set Priority and Size in the project (not just labels)
+- **Status:** Issue will be in "Backlog" status initially
 
-#### 2. Create Branch (REQUIRED)
+**Example:**
+```bash
+# Create issue with labels
+gh issue create -t "Add ingredient quantity validation" \
+  -b "Validate that quantities are positive numbers..." \
+  -l "enhancement,P1,size: S"
+
+# Note: After creating the issue, set the Priority and Size fields in the GitHub Project:
+# - Go to the project board
+# - Set Priority field to P0, P1, or P2
+# - Set Size field to XS, S, M, L, or XL
+```
+
+#### 2. Update Issue Status and Project Fields
+**Before creating your branch, update the issue:**
+
+1. **Set Status to "In Progress":**
+   - Go to the issue on GitHub or project board
+   - Change status from "Backlog" to "In Progress"
+   - This lets the team know you're actively working on it
+
+2. **Verify Project Fields (if not set during creation):**
+   - **Priority:** Should be set to P0, P1, or P2
+   - **Size:** Should be set to XS, S, M, L, or XL
+   - These appear in the right sidebar of the issue under the project section
+
+#### 3. Create Branch (REQUIRED)
 **Always branch from `main` before making any changes:**
 ```bash
 git checkout main
@@ -121,12 +180,15 @@ git checkout -b feature/issue-N-description
 ```
 
 **Branch Naming Convention:**
-- `feature/issue-5-recipe-media` - New features
-- `bugfix/issue-10-export-crash` - Bug fixes
-- `hotfix/critical-security-fix` - Urgent production fixes
-- `chore/update-dependencies` - Maintenance tasks
+- `feature/issue-N-description` - New features
+- `bugfix/issue-N-description` - Bug fixes
+- `hotfix/critical-issue-description` - Urgent production fixes
+- `docs/issue-N-description` - Documentation updates
+- `chore/issue-N-description` - Maintenance tasks
 
-#### 3. Develop Locally
+**Always include issue number in branch name!**
+
+#### 4. Develop Locally
 - Make **atomic commits** (one logical change per commit)
 - Reference issue in commits: `"feat: add image picker (Issue #5)"`
 - Run tests locally before pushing
@@ -143,9 +205,9 @@ test: add unit tests for export function (Issue #5)
 chore: update dependencies (Issue #5)
 ```
 
-#### 4. Create Pull Request
-- **Title:** `"Add feature X (Issue #N)"` or `"Fix bug Y (Issue #N)"`
-- **Body:** Include `"Closes #N"` to auto-link and close issue
+#### 5. Create Pull Request
+- **Title:** `"Add feature X (Closes #N)"` or `"Fix bug Y (Closes #N)"`
+- **Body:** Include `"Closes #N"` or `"Fixes #N"` to auto-link and close issue
 - **Description:** Summarize changes, testing status, and screenshots if applicable
 - **Wait:** CI/CD pipeline must pass before merging
 
@@ -166,31 +228,52 @@ Brief description of changes
 Closes #N
 ```
 
-#### 5. Review
+#### 6. Review
 - **Self-review:** Check code quality and test coverage
 - **CI/CD:** Verify all checks pass (quality, test, security, build)
 - **Address feedback:** Make changes if needed
 
-#### 6. Merge
+#### 7. Merge
 - **Method:** Use "Squash and merge" (keeps main history clean)
-- **Auto-close:** Issue automatically closes when PR is merged
+- **Auto-close:** Issue automatically closes and moves to "Done" status when PR is merged
 - **Branch:** Automatically deleted after merge
 
-#### 7. If More Work Needed
+#### 8. Post-Merge Cleanup
+**After PR is merged, clean up your local environment:**
+```bash
+# Switch back to main
+git checkout main
+
+# Pull the latest changes (includes your merged PR)
+git pull origin main
+
+# Delete your local feature branch
+git branch -d feature/issue-N-description
+
+# Verify issue is closed and in "Done" status on GitHub
+```
+
+#### 9. If More Work Needed
 
 **Option A: Small fix related to same issue**
 ```bash
+# Create NEW issue for the fix (e.g., Issue #6)
+gh issue create -t "Fix edge case in feature X" -l "bug,P1,size: XS"
+
+# Update status to "In Progress"
+# Create branch
 git checkout main
 git pull origin main
-git checkout -b bugfix/issue-5-export-fix
-# Make fix
-# Create new PR: "Fix export bug (Issue #5)"
+git checkout -b bugfix/issue-6-edge-case-fix
+
+# Make fix and create PR referencing new issue
+# PR title: "Fix edge case (Closes #6)"
 ```
 
 **Option B: New feature or unrelated change**
-- Create **new issue** (e.g., Issue #6)
-- Create PR for the new issue
-- Follow workflow from step 2
+- Create **new issue** with appropriate labels
+- Update status to "In Progress"
+- Follow workflow from step 3
 
 **❌ Never:** Reopen or reuse merged PRs/branches
 
