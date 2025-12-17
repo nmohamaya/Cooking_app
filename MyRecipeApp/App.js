@@ -13,6 +13,8 @@ export default function App() {
   const [extracting, setExtracting] = useState(false); // Loading state for extraction
   const [showExtractionModal, setShowExtractionModal] = useState(false);
   const [extractionText, setExtractionText] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState('');
   
   // Search and Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -315,36 +317,52 @@ export default function App() {
 
   // Import recipes from JSON file
   const importRecipes = async () => {
-    Alert.alert(
-      'Import Recipes',
-      'To import recipes, paste the JSON content or use file picker',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Paste JSON',
-          onPress: () => {
-            Alert.prompt(
-              'Import JSON',
-              'Paste your recipe JSON here:',
-              async (text) => {
-                try {
-                  const data = JSON.parse(text);
-                  if (data.recipes && Array.isArray(data.recipes)) {
-                    const imported = data.recipes.filter(r => r.id && r.title);
-                    saveRecipes([...recipes, ...imported]);
-                    Alert.alert('Success', `Imported ${imported.length} recipes!`);
-                  } else {
-                    Alert.alert('Error', 'Invalid format');
-                  }
-                } catch (error) {
-                  Alert.alert('Error', 'Failed to parse JSON');
-                }
-              }
-            );
-          },
-        },
-      ]
-    );
+    // Web: use file input
+    if (typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+            if (data.recipes && Array.isArray(data.recipes)) {
+              const imported = data.recipes.filter(r => r.id && r.title);
+              saveRecipes([...recipes, ...imported]);
+              Alert.alert('Success', `Imported ${imported.length} recipes!`);
+            } else {
+              Alert.alert('Error', 'Invalid format. Expected JSON with "recipes" array.');
+            }
+          } catch (error) {
+            console.error('Import error:', error);
+            Alert.alert('Error', 'Failed to parse JSON file.');
+          }
+        }
+      };
+      input.click();
+    } else {
+      // Mobile: show paste modal
+      setShowImportModal(true);
+    }
+  };
+
+  const performImport = async () => {
+    try {
+      const data = JSON.parse(importText);
+      if (data.recipes && Array.isArray(data.recipes)) {
+        const imported = data.recipes.filter(r => r.id && r.title);
+        saveRecipes([...recipes, ...imported]);
+        Alert.alert('Success', `Imported ${imported.length} recipes!`);
+        setShowImportModal(false);
+        setImportText('');
+      } else {
+        Alert.alert('Error', 'Invalid format. Expected JSON with "recipes" array.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to parse JSON. Please check the format.');
+    }
   };
 
   // Home Screen
@@ -559,6 +577,53 @@ export default function App() {
                   onPress={() => setShowFilters(false)}
                 >
                   <Text style={[styles.modalButtonText, styles.applyButtonText]}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Import Modal */}
+        <Modal
+          visible={showImportModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowImportModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Import Recipes</Text>
+              <Text style={styles.modalSubtitle}>
+                Paste your exported recipe JSON below:
+              </Text>
+              
+              <TextInput
+                style={styles.modalTextInput}
+                multiline
+                numberOfLines={10}
+                value={importText}
+                onChangeText={setImportText}
+                placeholder='{"version":"1.0","recipes":[...]}'
+                textAlignVertical="top"
+              />
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel]} 
+                  onPress={() => {
+                    setShowImportModal(false);
+                    setImportText('');
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonExtract]} 
+                  onPress={performImport}
+                  disabled={!importText.trim()}
+                >
+                  <Text style={styles.modalButtonText}>Import</Text>
                 </TouchableOpacity>
               </View>
             </View>
