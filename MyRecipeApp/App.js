@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { extractRecipeFromText } from './services/recipeExtraction';
+import { checkForDuplicate, formatDuplicateMessage } from './services/recipeComparison';
 import { Picker } from '@react-native-picker/picker';
 
 // Predefined categories and tags
@@ -25,6 +26,8 @@ export default function App() {
   const [showClearModal, setShowClearModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateRecipeTitle, setDuplicateRecipeTitle] = useState('');
+  const [pendingRecipe, setPendingRecipe] = useState(null); // Recipe waiting for duplicate confirmation
+  const [duplicateInfo, setDuplicateInfo] = useState(null); // Info about the potential duplicate
   
   // Search and Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -133,9 +136,71 @@ export default function App() {
       imageUri: String(form.imageUri || ''),
       videoUrl: String(form.videoUrl || ''),
     };
+    
+    // Check for duplicate recipes
+    const ingredientsList = form.ingredients
+      ? form.ingredients.split('\n').filter(i => i.trim())
+      : [];
+    const recipeForComparison = {
+      title: form.title,
+      ingredients: ingredientsList,
+    };
+    
+    // Prepare existing recipes for comparison
+    const existingForComparison = recipes.map(r => ({
+      ...r,
+      ingredients: typeof r.ingredients === 'string' 
+        ? r.ingredients.split('\n').filter(i => i.trim())
+        : r.ingredients || [],
+    }));
+    
+    const duplicate = checkForDuplicate(recipeForComparison, existingForComparison);
+    
+    if (duplicate) {
+      // Store the pending recipe and show duplicate modal
+      setPendingRecipe(newRecipe);
+      setDuplicateInfo(duplicate);
+      setShowDuplicateModal(true);
+      return;
+    }
+    
     saveRecipes([...recipes, newRecipe]);
     resetForm();
     setScreen('home');
+  };
+
+  // Duplicate modal handlers
+  const handleDuplicateCancel = () => {
+    setShowDuplicateModal(false);
+    setPendingRecipe(null);
+    setDuplicateInfo(null);
+  };
+
+  const handleDuplicateAddAsVariant = () => {
+    if (pendingRecipe && duplicateInfo) {
+      const variantRecipe = {
+        ...pendingRecipe,
+        variantOf: duplicateInfo.recipe.id,
+        title: `${pendingRecipe.title} (Variant)`,
+      };
+      saveRecipes([...recipes, variantRecipe]);
+      resetForm();
+      setScreen('home');
+    }
+    setShowDuplicateModal(false);
+    setPendingRecipe(null);
+    setDuplicateInfo(null);
+  };
+
+  const handleDuplicateAddAnyway = () => {
+    if (pendingRecipe) {
+      saveRecipes([...recipes, pendingRecipe]);
+      resetForm();
+      setScreen('home');
+    }
+    setShowDuplicateModal(false);
+    setPendingRecipe(null);
+    setDuplicateInfo(null);
   };
 
   const updateRecipe = () => {
@@ -1423,6 +1488,46 @@ export default function App() {
             </View>
           </View>
         </Modal>
+
+        {/* Duplicate Recipe Detection Modal */}
+        <Modal
+          visible={showDuplicateModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handleDuplicateCancel}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 450 }]}>
+              <Text style={styles.modalTitle}>⚠️ Similar Recipe Found</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 15 }]}>
+                {duplicateInfo ? formatDuplicateMessage(duplicateInfo) : ''}
+              </Text>
+              
+              <View style={{ gap: 10 }}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#4CAF50', width: '100%' }]} 
+                  onPress={handleDuplicateAddAsVariant}
+                >
+                  <Text style={styles.modalButtonText}>Add as Variant</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#2196F3', width: '100%' }]} 
+                  onPress={handleDuplicateAddAnyway}
+                >
+                  <Text style={styles.modalButtonText}>Add Anyway</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel, { width: '100%' }]} 
+                  onPress={handleDuplicateCancel}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -1589,26 +1694,40 @@ export default function App() {
           </View>
         </Modal>
 
-        {/* Duplicate Recipe Modal */}
+        {/* Duplicate Recipe Detection Modal */}
         <Modal
           visible={showDuplicateModal}
           transparent={true}
           animationType="fade"
-          onRequestClose={() => setShowDuplicateModal(false)}
+          onRequestClose={handleDuplicateCancel}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxWidth: 400 }]}>
-              <Text style={styles.modalTitle}>Already Added</Text>
-              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
-                "{duplicateRecipeTitle}" has already been added to your shopping list.
+            <View style={[styles.modalContent, { maxWidth: 450 }]}>
+              <Text style={styles.modalTitle}>⚠️ Similar Recipe Found</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 15 }]}>
+                {duplicateInfo ? formatDuplicateMessage(duplicateInfo) : ''}
               </Text>
               
-              <View style={styles.modalButtons}>
+              <View style={{ gap: 10 }}>
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#2196F3' }]} 
-                  onPress={() => setShowDuplicateModal(false)}
+                  style={[styles.modalButton, { backgroundColor: '#4CAF50', width: '100%' }]} 
+                  onPress={handleDuplicateAddAsVariant}
                 >
-                  <Text style={styles.modalButtonText}>OK</Text>
+                  <Text style={styles.modalButtonText}>Add as Variant</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#2196F3', width: '100%' }]} 
+                  onPress={handleDuplicateAddAnyway}
+                >
+                  <Text style={styles.modalButtonText}>Add Anyway</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalButtonCancel, { width: '100%' }]} 
+                  onPress={handleDuplicateCancel}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>
