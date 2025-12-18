@@ -118,15 +118,17 @@ graph TD
     A[1. Create Issue with P0/P1/P2 & Size labels + Set Project Fields] --> B[2. Set Status to 'In Progress' + Verify Priority/Size]
     B --> C[3. Create Branch from main]
     C --> D[4. Code & Commit changes]
-    D --> E[4b. Write Tests for new functionality]
+    D --> E[4b. Write Unit Tests for new functionality]
     E --> F[4c. Run tests locally - npm test]
     F --> G[5. Push & Create PR with 'Closes #N']
-    G --> H[5b. Set Issue Status to 'In Review']
-    H --> I[6. CI/CD Checks Pass]
-    I --> J[7. Merge PR - Issue auto-closes]
-    J --> K[7b. Issue Status auto-moves to 'Done']
-    K --> L[8. Switch to main & Pull]
-    L --> M[9. Delete local branch]
+    G --> H[5b. Create Test Issue for manual testing in Backlog]
+    H --> I[5c. Set Issue Status to 'In Review']
+    I --> J[6. CI/CD Checks Pass]
+    J --> K[7. Merge PR - Issue auto-closes]
+    K --> L[7b. Issue Status auto-moves to 'Done']
+    L --> M[8. Switch to main & Pull]
+    M --> N[9. Delete local branch]
+    N --> O[10. Complete Test Issue when ready]
 ```
 
 **Priority Labels:**
@@ -239,14 +241,55 @@ chore: update dependencies (Issue #5)
 - **Title:** `"Add feature X (Closes #N)"` or `"Fix bug Y (Closes #N)"`
 - **Body:** Include `"Closes #N"` or `"Fixes #N"` to auto-link and close issue
 - **Description:** Summarize changes, testing status, and screenshots if applicable
-- **Tests Required:** All PRs with new functionality must include tests
-- **Manual Testing Guide:** For user-facing changes, include a step-by-step testing guide in the PR (see template below)
+- **Tests Required:** All PRs with new functionality must include unit tests
 - **Wait:** CI/CD pipeline must pass before merging
 
-**After creating the PR, update issue status:**
-- Go to the issue on GitHub or project board
-- Change status from "In Progress" to "In Review"
-- This indicates the work is complete and awaiting code review/merge
+**After creating the PR:**
+1. **Update issue status:** Change from "In Progress" to "In Review"
+2. **Create a Test Issue:** For user-facing changes, create a separate test issue (see below)
+
+**Creating a Test Issue:**
+```bash
+# Create a test issue linked to the PR
+gh issue create -t "Test: [Feature Name] (PR #N)" \
+  -b "## Manual Testing for PR #N
+
+**Related PR:** #N
+**Related Issue:** #M
+
+---
+
+## Test Cases
+
+### [Feature/Scenario 1]
+- [ ] Test step 1
+- [ ] Test step 2
+- [ ] Expected result
+
+### [Feature/Scenario 2]
+- [ ] Test step 1
+- [ ] Expected result
+
+---
+
+## Platforms to Test
+- [ ] iOS
+- [ ] Android
+- [ ] Web
+
+## Notes
+_Add any issues or observations during testing here_" \
+  -l "testing"
+
+# Add the test issue to project board in Backlog
+# Set Priority (usually P2) and Size (usually S or XS)
+```
+
+**Why separate test issues?**
+- Testing can be scheduled independently from development
+- Test tasks can be assigned to different team members
+- Better tracking of testing progress on the project board
+- Keeps PR descriptions focused on code changes
 
 **PR Template:**
 ```markdown
@@ -258,42 +301,12 @@ Brief description of changes
 - ✅ Feature/fix 2
 
 ## Testing
-- ✅ Tests written and pass locally (20/20 tests passing)
-- ✅ Tested on web
-- 🟡 Mobile testing pending
+- ✅ Unit tests written and pass locally (X/X tests passing)
+- 📋 Manual test issue created: #N
 
-## 📋 Manual Testing Guide (Required for User-Facing Changes)
-
-### Prerequisites
-- List setup steps (npm install, environment config, etc.)
-
-### Test 1: [Feature Name]
-**Steps:**
-1. Step-by-step instructions
-2. What to click/tap
-3. What data to enter
-
-**Expected Results:**
-- [ ] Expected behavior 1
-- [ ] Expected behavior 2
-
-### Test 2: [Another Feature/Edge Case]
-**Steps:**
-1. ...
-
-**Expected Results:**
-- [ ] ...
-
-### Cross-Platform Verification
-- [ ] Tested on Web
-- [ ] Tested on Android
-- [ ] Tested on iOS (if applicable)
-
-## ✅ Testing Sign-off
-- [ ] All manual tests passed
-- [ ] User confirms feature works as expected
-
-Closes #N
+## Related Issues
+- Closes #N (feature issue)
+- Testing tracked in #M (test issue)
 ```
 
 #### 6. Review

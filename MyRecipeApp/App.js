@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, ScrollView, Image, Linking, ActivityIndicator, Modal } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, ScrollView, Image, Linking, ActivityIndicator, Modal, Vibration, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -8,6 +8,13 @@ import * as DocumentPicker from 'expo-document-picker';
 import { extractRecipeFromText, inferCategoryFromContent } from './services/recipeExtraction';
 import { checkForDuplicate, formatDuplicateMessage } from './services/recipeComparison';
 import { Picker } from '@react-native-picker/picker';
+import * as timerService from './services/timerService';
+import { 
+  FloatingTimerWidget, 
+  TimerWidgetModal, 
+  CreateTimerModal, 
+  TimerSuggestionsModal 
+} from './components/TimerComponents';
 
 // Predefined categories and tags
 const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
@@ -17,6 +24,7 @@ const TAGS = ['Quick', 'Vegetarian', 'Vegan', 'Spicy', 'Easy', 'Healthy'];
 const EXTRACTION_HISTORY_KEY = 'extractionHistory';
 const EXTRACTION_FEEDBACK_KEY = 'extractionFeedback';
 const MAX_EXTRACTION_HISTORY = 10;
+const TIMERS_STORAGE_KEY = 'cookingTimers';
 
 export default function App() {
   const [recipes, setRecipes] = useState([]);
@@ -54,6 +62,16 @@ export default function App() {
   // Shopping List state
   const [shoppingList, setShoppingList] = useState([]); // Array of { ingredient, quantity, unit, checked, recipeIds }
   
+  // Timer state
+  const [timers, setTimers] = useState([]); // Array of timer objects from timerService
+  const [showTimerWidget, setShowTimerWidget] = useState(false); // Show/hide timer widget
+  const [showCreateTimer, setShowCreateTimer] = useState(false); // Create timer modal
+  const [showTimerSuggestions, setShowTimerSuggestions] = useState(false); // Suggested timers modal
+  const [suggestedTimers, setSuggestedTimers] = useState([]); // Parsed timer suggestions
+  const [newTimerForm, setNewTimerForm] = useState({ hours: 0, minutes: 5, seconds: 0, label: '' });
+  const [timerForRecipe, setTimerForRecipe] = useState(null); // Recipe context for timer creation
+  const timerIntervalRef = useRef(null);
+  
   const [form, setForm] = useState({ 
     title: '', 
     category: 'Dinner', 
@@ -71,7 +89,129 @@ export default function App() {
     loadRecipes();
     loadShoppingList();
     loadExtractionHistory();
+    loadTimers();
+    timerService.configureNotifications();
   }, []);
+
+  // Timer countdown interval
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimers(prevTimers => {
+        let hasChanges = false;
+        const updatedTimers = prevTimers.map(timer => {
+          if (timer.status !== timerService.TIMER_STATUS.RUNNING) {
+            return timer;
+          }
+          
+          hasChanges = true;
+          const newRemaining = timer.remainingSeconds - 1;
+          
+          if (newRemaining <= 0) {
+            // Timer completed
+            if (Platform.OS !== 'web') {
+              Vibration.vibrate([0, 500, 200, 500]); // Vibrate pattern
+            }
+            return {
+              ...timer,
+              remainingSeconds: 0,
+              status: timerService.TIMER_STATUS.COMPLETED,
+              completedAt: new Date().toISOString(),
+            };
+          }
+          
+          return {
+            ...timer,
+            remainingSeconds: newRemaining,
+          };
+        });
+        
+        // Save to storage if there were changes
+        if (hasChanges) {
+          saveTimers(updatedTimers);
+        }
+        
+        return updatedTimers;
+      });
+    }, 1000);
+
+    timerIntervalRef.current = interval;
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Timer tick effect - update running timers every second
+  useEffect(() => {
+    const hasRunningTimers = timers.some(t => t.status === timerService.TIMER_STATUS.RUNNING);
+    
+    if (hasRunningTimers && !timerIntervalRef.current) {
+      timerIntervalRef.current = setInterval(() => {
+        setTimers(prevTimers => {
+          let hasCompleted = false;
+          const updated = prevTimers.map(timer => {
+            if (timer.status !== timerService.TIMER_STATUS.RUNNING) return timer;
+            
+            const newRemaining = timer.remainingSeconds - 1;
+            
+            if (newRemaining <= 0) {
+              hasCompleted = true;
+              // Timer completed
+              if (Platform.OS !== 'web') {
+                Vibration.vibrate([0, 500, 200, 500]); // Vibrate pattern
+              }
+              return {
+                ...timer,
+                remainingSeconds: 0,
+                status: timerService.TIMER_STATUS.COMPLETED,
+                completedAt: new Date().toISOString(),
+              };
+            }
+            
+            return { ...timer, remainingSeconds: newRemaining };
+          });
+          
+          // Show alert for completed timers
+          if (hasCompleted) {
+            const completedTimer = updated.find(t => 
+              t.status === timerService.TIMER_STATUS.COMPLETED && 
+              t.completedAt && 
+              !prevTimers.find(p => p.id === t.id && p.status === timerService.TIMER_STATUS.COMPLETED)
+            );
+            if (completedTimer) {
+              const message = `${completedTimer.icon} ${completedTimer.label} is done!`;
+              if (typeof window !== 'undefined' && window.alert) {
+                window.alert(message);
+              } else {
+                Alert.alert('Timer Complete!', message);
+              }
+            }
+          }
+          
+          return updated;
+        });
+      }, 1000);
+    } else if (!hasRunningTimers && timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
+  }, [timers]);
+
+  // Persist timers when they change
+  useEffect(() => {
+    if (timers.length > 0 || AsyncStorage.getItem(TIMERS_STORAGE_KEY)) {
+      saveTimers(timers);
+    }
+  }, [timers]);
 
   const loadExtractionHistory = async () => {
     try {
@@ -114,6 +254,165 @@ export default function App() {
     } catch (error) {
       console.error('Failed to clear extraction history:', error);
     }
+  };
+
+  // Timer functions
+  const loadTimers = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(TIMERS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Filter out completed timers older than 1 hour
+        const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+        const validTimers = parsed.filter(t => 
+          t.status !== timerService.TIMER_STATUS.COMPLETED || 
+          (t.completedAt && t.completedAt > oneHourAgo)
+        );
+        setTimers(validTimers);
+      }
+    } catch (error) {
+      console.error('Failed to load timers:', error);
+    }
+  };
+
+  const saveTimers = async (newTimers) => {
+    try {
+      await AsyncStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(newTimers));
+    } catch (error) {
+      console.error('Failed to save timers:', error);
+    }
+  };
+
+  const createNewTimer = (options = {}) => {
+    const duration = timerService.timeToSeconds(
+      options.hours || newTimerForm.hours,
+      options.minutes || newTimerForm.minutes,
+      options.seconds || newTimerForm.seconds
+    );
+    
+    if (duration <= 0) {
+      if (typeof window !== 'undefined' && window.alert) {
+        window.alert('Please set a time greater than 0');
+      } else {
+        Alert.alert('Invalid Time', 'Please set a time greater than 0');
+      }
+      return;
+    }
+
+    const timer = timerService.createTimer({
+      label: options.label || newTimerForm.label || 'Cooking Timer',
+      durationSeconds: duration,
+      recipeId: options.recipeId || timerForRecipe?.id,
+      recipeTitle: options.recipeTitle || timerForRecipe?.title,
+      type: options.type || 'CUSTOM',
+    });
+
+    setTimers(prev => [...prev, timer]);
+    setShowCreateTimer(false);
+    setNewTimerForm({ hours: 0, minutes: 5, seconds: 0, label: '' });
+    setTimerForRecipe(null);
+    
+    // Auto-start the timer
+    startTimer(timer.id);
+  };
+
+  const startTimer = async (timerId) => {
+    setTimers(prev => prev.map(timer => {
+      if (timer.id !== timerId) return timer;
+      
+      const updated = {
+        ...timer,
+        status: timerService.TIMER_STATUS.RUNNING,
+        startedAt: new Date().toISOString(),
+      };
+      
+      // Schedule notification
+      timerService.scheduleTimerNotification(updated).then(notificationId => {
+        if (notificationId) {
+          setTimers(t => t.map(tm => 
+            tm.id === timerId ? { ...tm, notificationId } : tm
+          ));
+        }
+      });
+      
+      return updated;
+    }));
+  };
+
+  const pauseTimer = (timerId) => {
+    setTimers(prev => prev.map(timer => {
+      if (timer.id !== timerId) return timer;
+      
+      // Cancel scheduled notification
+      if (timer.notificationId) {
+        timerService.cancelTimerNotification(timer.notificationId);
+      }
+      
+      return {
+        ...timer,
+        status: timerService.TIMER_STATUS.PAUSED,
+        pausedAt: new Date().toISOString(),
+        notificationId: null,
+      };
+    }));
+  };
+
+  const resumeTimer = (timerId) => {
+    startTimer(timerId);
+  };
+
+  const cancelTimer = (timerId) => {
+    setTimers(prev => {
+      const timer = prev.find(t => t.id === timerId);
+      if (timer?.notificationId) {
+        timerService.cancelTimerNotification(timer.notificationId);
+      }
+      return prev.filter(t => t.id !== timerId);
+    });
+  };
+
+  const addTimeToTimer = (timerId, seconds) => {
+    setTimers(prev => prev.map(timer => {
+      if (timer.id !== timerId) return timer;
+      return timerService.addTime(timer, seconds);
+    }));
+  };
+
+  const dismissCompletedTimer = (timerId) => {
+    cancelTimer(timerId);
+  };
+
+  const showTimerSuggestionsForRecipe = (recipe) => {
+    const suggestions = timerService.parseInstructionsForTimers(
+      recipe.instructions,
+      recipe.id,
+      recipe.title
+    );
+    setSuggestedTimers(suggestions);
+    setTimerForRecipe(recipe);
+    if (suggestions.length > 0) {
+      setShowTimerSuggestions(true);
+    } else {
+      // No suggestions, just open create timer modal
+      setShowCreateTimer(true);
+    }
+  };
+
+  const addSuggestedTimer = (suggestedTimer) => {
+    const timer = { ...suggestedTimer, id: `timer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` };
+    setTimers(prev => [...prev, timer]);
+    startTimer(timer.id);
+  };
+
+  const getRunningTimersCount = () => {
+    return timers.filter(t => 
+      t.status === timerService.TIMER_STATUS.RUNNING || 
+      t.status === timerService.TIMER_STATUS.PAUSED
+    ).length;
+  };
+
+  const getCompletedTimersCount = () => {
+    return timers.filter(t => t.status === timerService.TIMER_STATUS.COMPLETED).length;
   };
 
   const saveFeedback = async (isPositive, comment = '') => {
@@ -1316,6 +1615,14 @@ export default function App() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
+            style={[styles.smallButton, { marginRight: 8, backgroundColor: getRunningTimersCount() > 0 ? '#FF9800' : '#2196F3' }]}
+            onPress={() => setShowTimerWidget(true)}
+          >
+            <Text style={styles.smallButtonText}>
+              ⏱️ {getRunningTimersCount() > 0 ? `(${getRunningTimersCount()})` : 'Timer'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
             style={[styles.smallButton, { marginRight: 8 }]}
             onPress={exportRecipes}
           >
@@ -1688,6 +1995,58 @@ export default function App() {
             </View>
           </View>
         </Modal>
+
+        {/* Timer Floating Widget */}
+        <FloatingTimerWidget
+          timers={timers}
+          visible={!showTimerWidget && getRunningTimersCount() > 0}
+          onPress={() => setShowTimerWidget(true)}
+        />
+
+        {/* Timer Widget Modal */}
+        <TimerWidgetModal
+          visible={showTimerWidget}
+          onClose={() => setShowTimerWidget(false)}
+          timers={timers}
+          onStartTimer={startTimer}
+          onPauseTimer={pauseTimer}
+          onResumeTimer={resumeTimer}
+          onCancelTimer={cancelTimer}
+          onAddTime={addTimeToTimer}
+          onDismissCompleted={dismissCompletedTimer}
+          onCreateNew={() => {
+            setShowTimerWidget(false);
+            setShowCreateTimer(true);
+          }}
+        />
+
+        {/* Create Timer Modal */}
+        <CreateTimerModal
+          visible={showCreateTimer}
+          onClose={() => {
+            setShowCreateTimer(false);
+            setTimerForRecipe(null);
+            setNewTimerForm({ hours: 0, minutes: 5, seconds: 0, label: '' });
+          }}
+          onCreate={createNewTimer}
+          timerForm={newTimerForm}
+          setTimerForm={setNewTimerForm}
+          recipeContext={timerForRecipe}
+        />
+
+        {/* Timer Suggestions Modal */}
+        <TimerSuggestionsModal
+          visible={showTimerSuggestions}
+          onClose={() => {
+            setShowTimerSuggestions(false);
+            setTimerForRecipe(null);
+            setSuggestedTimers([]);
+          }}
+          suggestions={suggestedTimers}
+          onAddSuggestion={addSuggestedTimer}
+          onCreateCustom={() => setShowCreateTimer(true)}
+          recipeTitle={timerForRecipe?.title}
+        />
       </View>
     );
   }
@@ -2094,6 +2453,13 @@ export default function App() {
         </TouchableOpacity>
 
         <TouchableOpacity
+          style={[styles.button, { backgroundColor: '#FF9800' }]}
+          onPress={() => showTimerSuggestionsForRecipe(selectedRecipe)}
+        >
+          <Text style={styles.buttonText}>⏱️ Set Timer</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={styles.button}
           onPress={() => {
             setForm({
@@ -2185,6 +2551,58 @@ export default function App() {
             </View>
           </View>
         </Modal>
+
+        {/* Timer Floating Widget */}
+        <FloatingTimerWidget
+          timers={timers}
+          visible={!showTimerWidget && getRunningTimersCount() > 0}
+          onPress={() => setShowTimerWidget(true)}
+        />
+
+        {/* Timer Widget Modal */}
+        <TimerWidgetModal
+          visible={showTimerWidget}
+          onClose={() => setShowTimerWidget(false)}
+          timers={timers}
+          onStartTimer={startTimer}
+          onPauseTimer={pauseTimer}
+          onResumeTimer={resumeTimer}
+          onCancelTimer={cancelTimer}
+          onAddTime={addTimeToTimer}
+          onDismissCompleted={dismissCompletedTimer}
+          onCreateNew={() => {
+            setShowTimerWidget(false);
+            setShowCreateTimer(true);
+          }}
+        />
+
+        {/* Create Timer Modal */}
+        <CreateTimerModal
+          visible={showCreateTimer}
+          onClose={() => {
+            setShowCreateTimer(false);
+            setTimerForRecipe(null);
+            setNewTimerForm({ hours: 0, minutes: 5, seconds: 0, label: '' });
+          }}
+          onCreate={createNewTimer}
+          timerForm={newTimerForm}
+          setTimerForm={setNewTimerForm}
+          recipeContext={timerForRecipe}
+        />
+
+        {/* Timer Suggestions Modal */}
+        <TimerSuggestionsModal
+          visible={showTimerSuggestions}
+          onClose={() => {
+            setShowTimerSuggestions(false);
+            setTimerForRecipe(null);
+            setSuggestedTimers([]);
+          }}
+          suggestions={suggestedTimers}
+          onAddSuggestion={addSuggestedTimer}
+          onCreateCustom={() => setShowCreateTimer(true)}
+          recipeTitle={timerForRecipe?.title}
+        />
       </ScrollView>
     );
   }
