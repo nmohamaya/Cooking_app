@@ -77,6 +77,17 @@ To enable automatic recipe extraction from video descriptions/transcripts using 
    npm start
    ```
 
+   **Important:** If you change the `.env` file while the app is running, you need to clear the cache and restart:
+   ```bash
+   # Clean start (clears Metro bundler cache)
+   npm run start:clean
+   
+   # Or for web only
+   npm run web:clean
+   ```
+   
+   Also clear your browser cache (Ctrl+Shift+R) or open in an incognito window when testing on web.
+
 **Note:** GitHub Models provides **FREE** access to GPT-4o and other AI models for GitHub users. No credit card required! Without the token, you can still add recipes manually.
 
 ### Testing

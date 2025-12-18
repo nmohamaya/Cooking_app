@@ -1021,35 +1021,22 @@ export default function App() {
         lastText: text
       });
       
-      // Use web-compatible dialogs
-      try {
-        if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-          const canRetry = error.canRetry !== false;
-          if (canRetry && typeof window.confirm === 'function') {
-            const shouldRetry = window.confirm('Extraction Failed\n\n' + errorMessage + '\n\nWould you like to retry?');
-            if (shouldRetry) {
-              performExtraction(text);
-            }
-          } else {
-            window.alert('Extraction Failed\n\n' + errorMessage);
-          }
-        } else {
-          Alert.alert(
-            'Extraction Failed',
-            errorMessage,
-            error.canRetry !== false 
-              ? [
-                  { text: 'Retry', onPress: () => performExtraction(text) },
-                  { text: 'Cancel', style: 'cancel' }
-                ]
-              : [{ text: 'OK' }]
-          );
-        }
-      } catch (dialogError) {
-        console.error('Error showing dialog:', dialogError);
-        // Fallback - at least log the error
-        alert('Extraction Failed: ' + errorMessage);
+      // On mobile, also show an alert dialog
+      // On web, we rely on the UI error display which is more reliable
+      if (typeof window === 'undefined' || typeof document === 'undefined') {
+        // Mobile platform - use Alert
+        Alert.alert(
+          'Extraction Failed',
+          errorMessage,
+          error.canRetry !== false 
+            ? [
+                { text: 'Retry', onPress: () => performExtraction(text) },
+                { text: 'Cancel', style: 'cancel' }
+              ]
+            : [{ text: 'OK' }]
+        );
       }
+      // Web platform - error will be shown in UI via extractionError state
     } finally {
       setExtracting(false);
     }
@@ -1725,6 +1712,33 @@ export default function App() {
         </TouchableOpacity>
         {extracting && <Text style={styles.loadingText}>Extracting recipe using AI...</Text>}
         
+        {/* Error display for extraction failures */}
+        {extractionError && (
+          <View style={{ backgroundColor: '#ffebee', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#f44336' }}>
+            <Text style={{ color: '#c62828', fontWeight: 'bold', marginBottom: 4 }}>❌ Extraction Failed</Text>
+            <Text style={{ color: '#c62828', marginBottom: 8 }}>{extractionError.message}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {extractionError.canRetry && (
+                <TouchableOpacity 
+                  style={{ backgroundColor: '#f44336', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
+                  onPress={() => {
+                    setExtractionError(null);
+                    performExtraction(extractionError.lastText);
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Retry</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                style={{ backgroundColor: '#666', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
+                onPress={() => setExtractionError(null)}
+              >
+                <Text style={{ color: '#fff' }}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        
         <TextInput
           style={styles.input}
           placeholder="Recipe Title"
@@ -2194,6 +2208,33 @@ export default function App() {
           )}
         </TouchableOpacity>
         {extracting && <Text style={styles.loadingText}>Extracting recipe using AI...</Text>}
+        
+        {/* Error display for extraction failures */}
+        {extractionError && (
+          <View style={{ backgroundColor: '#ffebee', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#f44336' }}>
+            <Text style={{ color: '#c62828', fontWeight: 'bold', marginBottom: 4 }}>❌ Extraction Failed</Text>
+            <Text style={{ color: '#c62828', marginBottom: 8 }}>{extractionError.message}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {extractionError.canRetry && (
+                <TouchableOpacity 
+                  style={{ backgroundColor: '#f44336', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
+                  onPress={() => {
+                    setExtractionError(null);
+                    performExtraction(extractionError.lastText);
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Retry</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                style={{ backgroundColor: '#666', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
+                onPress={() => setExtractionError(null)}
+              >
+                <Text style={{ color: '#fff' }}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         
         <TextInput
           style={styles.input}
