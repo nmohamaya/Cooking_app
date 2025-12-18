@@ -7,6 +7,106 @@ import Constants from 'expo-constants';
 const GITHUB_TOKEN = Constants.expoConfig?.extra?.githubToken || '';
 const API_URL = 'https://models.inference.ai.azure.com';
 const MODEL_NAME = 'gpt-4o'; // Free GitHub Models: gpt-4o, gpt-4o-mini, llama-3.1-405b, etc.
+const EXTRACTION_TIMEOUT = 15000; // 15 second timeout
+
+// Valid categories matching App.js CATEGORIES constant
+const VALID_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
+
+// Category inference keywords
+const CATEGORY_KEYWORDS = {
+  Breakfast: ['breakfast', 'pancake', 'waffle', 'omelette', 'omelet', 'egg', 'toast', 'cereal', 'oatmeal', 'smoothie', 'brunch', 'muffin', 'bagel', 'morning'],
+  Lunch: ['lunch', 'sandwich', 'wrap', 'salad', 'soup', 'midday'],
+  Dinner: ['dinner', 'roast', 'steak', 'main course', 'entrée', 'entree', 'supper'],
+  Dessert: ['dessert', 'cake', 'cookie', 'pie', 'brownie', 'ice cream', 'pudding', 'chocolate', 'sweet', 'candy', 'pastry', 'tart', 'cheesecake', 'mousse', 'custard'],
+  Snacks: ['snack', 'chips', 'popcorn', 'nuts', 'trail mix', 'crackers', 'finger food', 'bite', 'nibble'],
+  Appetizers: ['appetizer', 'starter', 'hors d\'oeuvre', 'dip', 'bruschetta', 'canapé', 'canape', 'tapas', 'finger food'],
+  Asian: ['asian', 'chinese', 'japanese', 'korean', 'thai', 'vietnamese', 'indian', 'curry', 'stir fry', 'wok', 'noodle', 'ramen', 'sushi', 'dim sum', 'teriyaki', 'soy sauce', 'ginger', 'sesame', 'tofu', 'pad thai', 'pho', 'kimchi', 'miso', 'wasabi'],
+  Vegan: ['vegan', 'plant-based', 'plant based', 'no dairy', 'dairy-free', 'egg-free', 'no eggs', 'no meat', 'no animal'],
+  Vegetarian: ['vegetarian', 'veggie', 'meatless', 'no meat', 'meat-free'],
+};
+
+/**
+ * Infer category from recipe title and ingredients
+ * @param {string} title - Recipe title
+ * @param {string} ingredients - Recipe ingredients
+ * @returns {string} Inferred category or 'Dinner' as default
+ */
+export const inferCategoryFromContent = (title = '', ingredients = '') => {
+  const content = `${title} ${ingredients}`.toLowerCase();
+  
+  // Check for specific categories first (more specific wins)
+  // Priority order: Vegan > Vegetarian > Asian > Dessert > Breakfast > Appetizers > Snacks > Lunch > Dinner
+  const priorityOrder = ['Vegan', 'Vegetarian', 'Asian', 'Dessert', 'Breakfast', 'Appetizers', 'Snacks', 'Lunch', 'Dinner'];
+  
+  for (const category of priorityOrder) {
+    const keywords = CATEGORY_KEYWORDS[category];
+    for (const keyword of keywords) {
+      if (content.includes(keyword)) {
+        return category;
+      }
+    }
+  }
+  
+  return 'Dinner'; // Default fallback
+};
+
+/**
+ * Parse and format error messages for user-friendly display
+ * @param {Error} error - The error object
+ * @returns {Object} { message: string, canRetry: boolean }
+ */
+export const parseExtractionError = (error) => {
+  const errorMessage = error.message || '';
+  const errorResponse = error.response?.data?.error?.message || error.response?.data?.message || '';
+  
+  // Check for specific error types
+  if (errorMessage.includes('timeout') || error.code === 'ECONNABORTED') {
+    return {
+      message: 'Request timed out. The AI service is taking too long to respond. Please try again.',
+      canRetry: true,
+      errorType: 'timeout'
+    };
+  }
+  
+  if (errorMessage.includes('Network Error') || error.code === 'ERR_NETWORK') {
+    return {
+      message: 'Network error. Please check your internet connection and try again.',
+      canRetry: true,
+      errorType: 'network'
+    };
+  }
+  
+  if (error.response?.status === 401 || errorResponse.includes('unauthorized') || errorResponse.includes('invalid') && errorResponse.includes('token')) {
+    return {
+      message: 'Invalid GitHub token. Please check your GITHUB_TOKEN in the .env file.',
+      canRetry: false,
+      errorType: 'auth'
+    };
+  }
+  
+  if (error.response?.status === 429) {
+    return {
+      message: 'Too many requests. Please wait a moment and try again.',
+      canRetry: true,
+      errorType: 'rate_limit'
+    };
+  }
+  
+  if (error.response?.status >= 500) {
+    return {
+      message: 'The AI service is temporarily unavailable. Please try again later.',
+      canRetry: true,
+      errorType: 'server'
+    };
+  }
+  
+  // Generic error
+  return {
+    message: `Failed to extract recipe: ${errorMessage || 'Unknown error'}`,
+    canRetry: true,
+    errorType: 'unknown'
+  };
+};
 
 /**
  * Extract recipe from cooking video URL
@@ -60,6 +160,12 @@ const getVideoTranscript = async (videoUrl) => {
  * @returns {Promise<Object>} Parsed recipe data
  */
 export const extractRecipeFromTranscript = async (transcript) => {
+  if (!GITHUB_TOKEN) {
+    const error = new Error('GitHub token not configured. Please add GITHUB_TOKEN to .env file.');
+    error.errorType = 'auth';
+    throw error;
+  }
+
   try {
     const response = await axios.post(
       `${API_URL}/chat/completions`,
@@ -102,35 +208,42 @@ If any other field is not mentioned, use empty string. Be concise and clear.`
         headers: {
           'Authorization': `Bearer ${GITHUB_TOKEN}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: EXTRACTION_TIMEOUT
       }
     );
 
     const content = response.data.choices[0].message.content;
     const recipe = JSON.parse(content);
 
-    // Valid categories that match App.js CATEGORIES constant
-    const validCategories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
+    // Get title and ingredients for fallback inference
+    const title = String(recipe.title || '');
+    const ingredients = String(recipe.ingredients || '');
     
-    // Validate category or use default
-    let category = String(recipe.category || 'Dinner');
-    if (!validCategories.includes(category)) {
-      console.warn(`Invalid category "${category}" detected, using default "Dinner"`);
-      category = 'Dinner';
+    // Validate category - use AI result if valid, otherwise infer from content
+    let category = String(recipe.category || '');
+    if (!VALID_CATEGORIES.includes(category)) {
+      console.warn(`Invalid or empty category "${category}" detected, inferring from content`);
+      category = inferCategoryFromContent(title, ingredients);
     }
 
     // Validate and normalize the response
     return {
-      title: String(recipe.title || ''),
+      title: title,
       category: category,
-      ingredients: String(recipe.ingredients || ''),
+      ingredients: ingredients,
       instructions: String(recipe.instructions || ''),
       prepTime: String(recipe.prepTime || ''),
       cookTime: String(recipe.cookTime || ''),
     };
   } catch (error) {
     console.error('GPT extraction error:', error);
-    throw new Error(`Failed to extract recipe: ${error.message}`);
+    // Re-throw with parsed error for better UI handling
+    const parsedError = parseExtractionError(error);
+    const enhancedError = new Error(parsedError.message);
+    enhancedError.canRetry = parsedError.canRetry;
+    enhancedError.errorType = parsedError.errorType;
+    throw enhancedError;
   }
 };
 

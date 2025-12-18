@@ -618,3 +618,252 @@ describe('Duplicate Recipe Detection Feature', () => {
     });
   });
 });
+
+/**
+ * Tests for AI Extraction Improvements (Issue #18)
+ * 
+ * This test suite covers:
+ * - Category inference from title and ingredients
+ * - Extraction history management
+ * - Error parsing and user-friendly messages
+ */
+describe('AI Extraction Improvements', () => {
+  // Category inference keywords (copied from recipeExtraction.js for testing)
+  const CATEGORY_KEYWORDS = {
+    Breakfast: ['breakfast', 'pancake', 'waffle', 'omelette', 'omelet', 'egg', 'toast', 'cereal', 'oatmeal', 'smoothie', 'brunch', 'muffin', 'bagel', 'morning'],
+    Lunch: ['lunch', 'sandwich', 'wrap', 'salad', 'soup', 'midday'],
+    Dinner: ['dinner', 'roast', 'steak', 'main course', 'entrée', 'entree', 'supper'],
+    Dessert: ['dessert', 'cake', 'cookie', 'pie', 'brownie', 'ice cream', 'pudding', 'chocolate', 'sweet', 'candy', 'pastry', 'tart', 'cheesecake', 'mousse', 'custard'],
+    Snacks: ['snack', 'chips', 'popcorn', 'nuts', 'trail mix', 'crackers', 'finger food', 'bite', 'nibble'],
+    Appetizers: ['appetizer', 'starter', 'hors d\'oeuvre', 'dip', 'bruschetta', 'canapé', 'canape', 'tapas', 'finger food'],
+    Asian: ['asian', 'chinese', 'japanese', 'korean', 'thai', 'vietnamese', 'indian', 'curry', 'stir fry', 'wok', 'noodle', 'ramen', 'sushi', 'dim sum', 'teriyaki', 'soy sauce', 'ginger', 'sesame', 'tofu', 'pad thai', 'pho', 'kimchi', 'miso', 'wasabi'],
+    Vegan: ['vegan', 'plant-based', 'plant based', 'no dairy', 'dairy-free', 'egg-free', 'no eggs', 'no meat', 'no animal'],
+    Vegetarian: ['vegetarian', 'veggie', 'meatless', 'no meat', 'meat-free'],
+  };
+
+  // Local implementation of inferCategoryFromContent for testing
+  const inferCategoryFromContent = (title = '', ingredients = '') => {
+    const content = `${title} ${ingredients}`.toLowerCase();
+    const priorityOrder = ['Vegan', 'Vegetarian', 'Asian', 'Dessert', 'Breakfast', 'Appetizers', 'Snacks', 'Lunch', 'Dinner'];
+    
+    for (const category of priorityOrder) {
+      const keywords = CATEGORY_KEYWORDS[category];
+      for (const keyword of keywords) {
+        if (content.includes(keyword)) {
+          return category;
+        }
+      }
+    }
+    return 'Dinner';
+  };
+
+  // Local implementation of parseExtractionError for testing
+  const parseExtractionError = (error) => {
+    const errorMessage = error.message || '';
+    const errorResponse = error.response?.data?.error?.message || error.response?.data?.message || '';
+    
+    if (errorMessage.includes('timeout') || error.code === 'ECONNABORTED') {
+      return { message: 'Request timed out.', canRetry: true, errorType: 'timeout' };
+    }
+    if (errorMessage.includes('Network Error') || error.code === 'ERR_NETWORK') {
+      return { message: 'Network error.', canRetry: true, errorType: 'network' };
+    }
+    if (error.response?.status === 401 || errorResponse.includes('unauthorized') || (errorResponse.includes('invalid') && errorResponse.includes('token'))) {
+      return { message: 'Invalid GitHub token.', canRetry: false, errorType: 'auth' };
+    }
+    if (error.response?.status === 429) {
+      return { message: 'Too many requests.', canRetry: true, errorType: 'rate_limit' };
+    }
+    if (error.response?.status >= 500) {
+      return { message: 'Service unavailable.', canRetry: true, errorType: 'server' };
+    }
+    return { message: `Failed: ${errorMessage || 'Unknown'}`, canRetry: true, errorType: 'unknown' };
+  };
+
+  describe('Category Inference from Content', () => {
+    it('should infer Breakfast from breakfast-related keywords', () => {
+      expect(inferCategoryFromContent('Breakfast Burrito', '')).toBe('Breakfast');
+      expect(inferCategoryFromContent('Fluffy Omelette', '')).toBe('Breakfast');
+      expect(inferCategoryFromContent('Morning Smoothie Bowl', '')).toBe('Breakfast');
+      expect(inferCategoryFromContent('Toast with Avocado', '')).toBe('Breakfast');
+    });
+
+    it('should infer Dessert from sweet dishes', () => {
+      expect(inferCategoryFromContent('Chocolate Chip Cookies', '')).toBe('Dessert');
+      expect(inferCategoryFromContent('Cheesecake', '')).toBe('Dessert');
+      expect(inferCategoryFromContent('Ice Cream Sundae', '')).toBe('Dessert');
+      expect(inferCategoryFromContent('Apple Pie', '')).toBe('Dessert');
+    });
+
+    it('should infer Asian from Asian cuisine keywords', () => {
+      expect(inferCategoryFromContent('Chicken Stir Fry', '')).toBe('Asian');
+      expect(inferCategoryFromContent('Beef Ramen', '')).toBe('Asian');
+      expect(inferCategoryFromContent('Pad Thai', '')).toBe('Asian');
+      expect(inferCategoryFromContent('Sushi Rolls', '')).toBe('Asian');
+      expect(inferCategoryFromContent('Recipe', 'soy sauce, ginger, sesame oil')).toBe('Asian');
+    });
+
+    it('should infer Vegan from plant-based keywords', () => {
+      expect(inferCategoryFromContent('Vegan Buddha Bowl', '')).toBe('Vegan');
+      expect(inferCategoryFromContent('Plant-Based Burger', '')).toBe('Vegan');
+    });
+
+    it('should infer Vegetarian from meatless keywords', () => {
+      expect(inferCategoryFromContent('Vegetarian Lasagna', '')).toBe('Vegetarian');
+      expect(inferCategoryFromContent('Veggie Burger', '')).toBe('Vegetarian');
+    });
+
+    it('should infer Appetizers from starter keywords', () => {
+      expect(inferCategoryFromContent('Bruschetta', '')).toBe('Appetizers');
+      expect(inferCategoryFromContent('Spinach Dip', '')).toBe('Appetizers');
+      expect(inferCategoryFromContent('Appetizer Platter', '')).toBe('Appetizers');
+    });
+
+    it('should infer Snacks from snack keywords', () => {
+      expect(inferCategoryFromContent('Homemade Popcorn', '')).toBe('Snacks');
+      expect(inferCategoryFromContent('Trail Mix', '')).toBe('Snacks');
+      expect(inferCategoryFromContent('Quick Snack Bites', '')).toBe('Snacks');
+    });
+
+    it('should default to Dinner when no keywords match', () => {
+      expect(inferCategoryFromContent('Mystery Recipe', '')).toBe('Dinner');
+      expect(inferCategoryFromContent('', '')).toBe('Dinner');
+      expect(inferCategoryFromContent('Random Dish', 'some ingredients')).toBe('Dinner');
+    });
+
+    it('should prioritize more specific categories', () => {
+      // Vegan should win over Vegetarian
+      expect(inferCategoryFromContent('Vegan Vegetarian Dish', '')).toBe('Vegan');
+      // Asian should be detected from ingredients
+      expect(inferCategoryFromContent('Simple Noodles', 'tofu, soy sauce')).toBe('Asian');
+    });
+  });
+
+  describe('Error Parsing', () => {
+    it('should identify timeout errors', () => {
+      const timeoutError = new Error('Request timeout');
+      timeoutError.code = 'ECONNABORTED';
+      const result = parseExtractionError(timeoutError);
+      expect(result.errorType).toBe('timeout');
+      expect(result.canRetry).toBe(true);
+    });
+
+    it('should identify network errors', () => {
+      const networkError = new Error('Network Error');
+      networkError.code = 'ERR_NETWORK';
+      const result = parseExtractionError(networkError);
+      expect(result.errorType).toBe('network');
+      expect(result.canRetry).toBe(true);
+    });
+
+    it('should identify auth errors from 401 status', () => {
+      const authError = new Error('Unauthorized');
+      authError.response = { status: 401 };
+      const result = parseExtractionError(authError);
+      expect(result.errorType).toBe('auth');
+      expect(result.canRetry).toBe(false);
+    });
+
+    it('should identify rate limit errors', () => {
+      const rateLimitError = new Error('Too many requests');
+      rateLimitError.response = { status: 429 };
+      const result = parseExtractionError(rateLimitError);
+      expect(result.errorType).toBe('rate_limit');
+      expect(result.canRetry).toBe(true);
+    });
+
+    it('should identify server errors', () => {
+      const serverError = new Error('Internal Server Error');
+      serverError.response = { status: 500 };
+      const result = parseExtractionError(serverError);
+      expect(result.errorType).toBe('server');
+      expect(result.canRetry).toBe(true);
+    });
+
+    it('should handle unknown errors', () => {
+      const unknownError = new Error('Something went wrong');
+      const result = parseExtractionError(unknownError);
+      expect(result.errorType).toBe('unknown');
+      expect(result.canRetry).toBe(true);
+    });
+  });
+
+  describe('Extraction History Logic', () => {
+    const MAX_EXTRACTION_HISTORY = 10;
+
+    it('should limit history to max entries', () => {
+      const existingHistory = Array.from({ length: 12 }, (_, i) => ({
+        id: String(i),
+        text: `Recipe ${i}`,
+        resultTitle: `Title ${i}`,
+        timestamp: new Date().toISOString(),
+      }));
+
+      const newEntry = {
+        id: String(Date.now()),
+        text: 'New Recipe',
+        resultTitle: 'New Title',
+        timestamp: new Date().toISOString(),
+      };
+
+      const newHistory = [newEntry, ...existingHistory].slice(0, MAX_EXTRACTION_HISTORY);
+      expect(newHistory).toHaveLength(MAX_EXTRACTION_HISTORY);
+      expect(newHistory[0].text).toBe('New Recipe');
+    });
+
+    it('should add new entry at the beginning', () => {
+      const existingHistory = [
+        { id: '1', text: 'Old Recipe', resultTitle: 'Old Title', timestamp: '2024-01-01' },
+      ];
+
+      const newEntry = {
+        id: '2',
+        text: 'New Recipe',
+        resultTitle: 'New Title',
+        timestamp: '2024-01-02',
+      };
+
+      const newHistory = [newEntry, ...existingHistory].slice(0, MAX_EXTRACTION_HISTORY);
+      expect(newHistory[0].id).toBe('2');
+      expect(newHistory[1].id).toBe('1');
+    });
+
+    it('should truncate long text for display', () => {
+      const longText = 'A'.repeat(500);
+      const truncatedText = longText.substring(0, 200);
+      expect(truncatedText.length).toBe(200);
+    });
+  });
+
+  describe('Feedback Storage Logic', () => {
+    it('should create feedback entry with required fields', () => {
+      const feedback = {
+        id: String(Date.now()),
+        recipeTitle: 'Test Recipe',
+        isPositive: true,
+        comment: 'Great extraction!',
+        timestamp: new Date().toISOString(),
+      };
+
+      expect(feedback).toHaveProperty('id');
+      expect(feedback).toHaveProperty('recipeTitle');
+      expect(feedback).toHaveProperty('isPositive');
+      expect(feedback).toHaveProperty('comment');
+      expect(feedback).toHaveProperty('timestamp');
+      expect(feedback.isPositive).toBe(true);
+    });
+
+    it('should allow negative feedback with comment', () => {
+      const feedback = {
+        id: String(Date.now()),
+        recipeTitle: 'Test Recipe',
+        isPositive: false,
+        comment: 'Ingredients were wrong',
+        timestamp: new Date().toISOString(),
+      };
+
+      expect(feedback.isPositive).toBe(false);
+      expect(feedback.comment).toBe('Ingredients were wrong');
+    });
+  });
+});

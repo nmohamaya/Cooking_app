@@ -229,6 +229,7 @@ chore: update dependencies (Issue #5)
 - **Body:** Include `"Closes #N"` or `"Fixes #N"` to auto-link and close issue
 - **Description:** Summarize changes, testing status, and screenshots if applicable
 - **Tests Required:** All PRs with new functionality must include tests
+- **Manual Testing Guide:** For user-facing changes, include a step-by-step testing guide in the PR (see template below)
 - **Wait:** CI/CD pipeline must pass before merging
 
 **After creating the PR, update issue status:**
@@ -249,6 +250,37 @@ Brief description of changes
 - ✅ Tests written and pass locally (20/20 tests passing)
 - ✅ Tested on web
 - 🟡 Mobile testing pending
+
+## 📋 Manual Testing Guide (Required for User-Facing Changes)
+
+### Prerequisites
+- List setup steps (npm install, environment config, etc.)
+
+### Test 1: [Feature Name]
+**Steps:**
+1. Step-by-step instructions
+2. What to click/tap
+3. What data to enter
+
+**Expected Results:**
+- [ ] Expected behavior 1
+- [ ] Expected behavior 2
+
+### Test 2: [Another Feature/Edge Case]
+**Steps:**
+1. ...
+
+**Expected Results:**
+- [ ] ...
+
+### Cross-Platform Verification
+- [ ] Tested on Web
+- [ ] Tested on Android
+- [ ] Tested on iOS (if applicable)
+
+## ✅ Testing Sign-off
+- [ ] All manual tests passed
+- [ ] User confirms feature works as expected
 
 Closes #N
 ```

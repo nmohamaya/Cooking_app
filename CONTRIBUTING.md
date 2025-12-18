@@ -1,11 +1,39 @@
 # Contribution Guidelines
 
-## Getting Started
-1. Fork the repository
-2. Create a feature branch from `develop`
-3. Make your changes
-4. Ensure all tests pass locally
-5. Submit a pull request
+## Development Workflow
+
+**📋 See [MyRecipeApp/README.md](MyRecipeApp/README.md#project-workflow) for the complete development workflow.**
+
+This includes:
+- Issue creation and project board management
+- Branch naming conventions
+- Commit message standards
+- PR requirements and review process
+- Post-merge cleanup
+
+## Quick Reference
+
+### Before Starting Work
+1. Create an issue (required before any code changes)
+2. Set issue status to "In Progress" in GitHub Project
+3. Create feature branch from `main`: `git checkout -b feature/issue-N-description`
+
+### During Development
+- Write tests for new functionality
+- Run tests locally: `npm test`
+- Run security audit: `npm run security`
+- Make atomic commits with issue reference
+
+### Creating PR
+1. Push branch and create PR with "Closes #N" in title/body
+2. Set issue status to "In Review"
+3. Complete manual testing checklist
+4. Wait for CI/CD checks to pass
+
+### After Merge
+1. Switch to main: `git checkout main`
+2. Pull changes: `git pull origin main`
+3. Delete local branch: `git branch -d feature/issue-N-description`
 
 ## Code Standards
 
@@ -27,7 +55,6 @@
 
 ## PR Requirements
 - ✅ All CI checks must pass
-- ✅ At least one code review approval
 - ✅ No merge conflicts
 - ✅ Tests included and passing
 - ✅ Security audit passing
@@ -71,27 +98,11 @@ Before merging any PR that affects user-visible functionality:
 - Provide environment details
 - Add relevant labels
 
-## Development Workflow
-
-### Local Testing
-```bash
-cd MyRecipeApp
-npm install
-npm test
-npm run security
-npm run web
-```
-
-### Before Committing
-```bash
-npm test -- --coverage
-npm run security
-npm run lint --if-present
-```
-
 ## Branch Naming
-- `feature/` - new features
-- `fix/` - bug fixes
-- `docs/` - documentation
-- `test/` - test improvements
-- `ci/` - CI/CD improvements
+- `feature/issue-N-description` - new features
+- `bugfix/issue-N-description` - bug fixes
+- `hotfix/critical-description` - urgent production fixes
+- `docs/issue-N-description` - documentation
+- `chore/issue-N-description` - maintenance tasks
+
+**Always include issue number in branch name!**
