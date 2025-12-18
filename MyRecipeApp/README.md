@@ -434,10 +434,17 @@ MyRecipeApp/
 ### Automated Tests
 
 The AI recipe extraction feature has been thoroughly tested:
-
-- **[TESTING_SUMMARY.md](TESTING_SUMMARY.md)** - Quick overview and results
-- **[TEST_RESULTS_REPORT.md](TEST_RESULTS_REPORT.md)** - Comprehensive test report
+5. Create a separate Test Issue for manual tests and add it to the project board.
+6. Complete PR review and merge when all checks pass.
+7. Mark the Test Issue as Done after manual testing is complete.
 - **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Manual testing procedures
+## CI/CD Reliability Best Practices
+
+- Always run `npm test` and `npm run lint` locally before pushing
+- If CI fails, investigate logs and document the fix in the PR
+- Flaky tests must be fixed or quarantined before merging
+- After merging, monitor CI for delayed failures and create issues if needed
+- Regularly review and update dependencies to avoid compatibility issues
 
 ### Test Scripts
 
