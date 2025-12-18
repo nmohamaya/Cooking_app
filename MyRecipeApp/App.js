@@ -5,13 +5,18 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
-import { extractRecipeFromText } from './services/recipeExtraction';
+import { extractRecipeFromText, inferCategoryFromContent } from './services/recipeExtraction';
 import { checkForDuplicate, formatDuplicateMessage } from './services/recipeComparison';
 import { Picker } from '@react-native-picker/picker';
 
 // Predefined categories and tags
 const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
 const TAGS = ['Quick', 'Vegetarian', 'Vegan', 'Spicy', 'Easy', 'Healthy'];
+
+// Storage keys for extraction features
+const EXTRACTION_HISTORY_KEY = 'extractionHistory';
+const EXTRACTION_FEEDBACK_KEY = 'extractionFeedback';
+const MAX_EXTRACTION_HISTORY = 10;
 
 export default function App() {
   const [recipes, setRecipes] = useState([]);
@@ -20,6 +25,12 @@ export default function App() {
   const [extracting, setExtracting] = useState(false); // Loading state for extraction
   const [showExtractionModal, setShowExtractionModal] = useState(false);
   const [extractionText, setExtractionText] = useState('');
+  const [extractionHistory, setExtractionHistory] = useState([]); // Last 10 extractions
+  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
+  const [extractionError, setExtractionError] = useState(null); // { message, canRetry }
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [lastExtractedRecipe, setLastExtractedRecipe] = useState(null);
+  const [feedbackComment, setFeedbackComment] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importText, setImportText] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -55,11 +66,92 @@ export default function App() {
     videoUrl: ''
   });
 
-  // Load recipes and shopping list on mount
+  // Load recipes, shopping list, and extraction history on mount
   useEffect(() => {
     loadRecipes();
     loadShoppingList();
+    loadExtractionHistory();
   }, []);
+
+  const loadExtractionHistory = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(EXTRACTION_HISTORY_KEY);
+      if (stored) {
+        setExtractionHistory(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Failed to load extraction history:', error);
+    }
+  };
+
+  const saveExtractionToHistory = async (text, result) => {
+    try {
+      const entry = {
+        id: Date.now().toString(),
+        text: text.substring(0, 200), // Store first 200 chars for display
+        fullText: text,
+        resultTitle: result.title,
+        timestamp: new Date().toISOString(),
+      };
+      
+      const newHistory = [entry, ...extractionHistory].slice(0, MAX_EXTRACTION_HISTORY);
+      setExtractionHistory(newHistory);
+      await AsyncStorage.setItem(EXTRACTION_HISTORY_KEY, JSON.stringify(newHistory));
+    } catch (error) {
+      console.error('Failed to save extraction history:', error);
+    }
+  };
+
+  const clearExtractionHistory = async () => {
+    try {
+      setExtractionHistory([]);
+      await AsyncStorage.removeItem(EXTRACTION_HISTORY_KEY);
+      if (typeof window !== 'undefined' && window.alert) {
+        window.alert('Extraction history cleared');
+      } else {
+        Alert.alert('Success', 'Extraction history cleared');
+      }
+    } catch (error) {
+      console.error('Failed to clear extraction history:', error);
+    }
+  };
+
+  const saveFeedback = async (isPositive, comment = '') => {
+    try {
+      const storedFeedback = await AsyncStorage.getItem(EXTRACTION_FEEDBACK_KEY);
+      const feedback = storedFeedback ? JSON.parse(storedFeedback) : [];
+      
+      feedback.push({
+        id: Date.now().toString(),
+        recipeTitle: lastExtractedRecipe?.title || 'Unknown',
+        isPositive,
+        comment,
+        timestamp: new Date().toISOString(),
+      });
+      
+      await AsyncStorage.setItem(EXTRACTION_FEEDBACK_KEY, JSON.stringify(feedback));
+      
+      // Close modal first, then show thank you message
+      setShowFeedbackModal(false);
+      setFeedbackComment('');
+      
+      // Show thank you message - use window.alert on web for reliability
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('Thank you! Your feedback helps improve our AI extraction.');
+        } else {
+          Alert.alert('Thank you!', 'Your feedback helps improve our AI extraction.');
+        }
+      }, 200);
+    } catch (error) {
+      console.error('Failed to save feedback:', error);
+      if (typeof window !== 'undefined' && window.alert) {
+        window.alert('Error: Failed to save feedback. Please try again.');
+      } else {
+        Alert.alert('Error', 'Failed to save feedback. Please try again.');
+      }
+    }
+  };
 
   const loadRecipes = async () => {
     try {
@@ -866,17 +958,26 @@ export default function App() {
     setShowExtractionModal(true);
   };
 
-  const performExtraction = async () => {
-    if (!extractionText || !extractionText.trim()) {
-      Alert.alert('Error', 'Please provide recipe text to extract');
+  const performExtraction = async (textToExtract = null) => {
+    const text = textToExtract || extractionText;
+    if (!text || !text.trim()) {
+      if (typeof window !== 'undefined' && window.alert) {
+        window.alert('Please provide recipe text to extract');
+      } else {
+        Alert.alert('Error', 'Please provide recipe text to extract');
+      }
       return;
     }
 
     setShowExtractionModal(false);
     setExtracting(true);
+    setExtractionError(null);
     
     try {
-      const extractedRecipe = await extractRecipeFromText(extractionText);
+      const extractedRecipe = await extractRecipeFromText(text);
+      
+      // Save to extraction history
+      await saveExtractionToHistory(text, extractedRecipe);
       
       // Merge extracted data with existing form data (keep videoUrl and imageUri)
       setForm({
@@ -890,17 +991,52 @@ export default function App() {
       });
 
       setExtractionText('');
-      Alert.alert(
-        'Success',
-        'Recipe extracted! Please review and edit the fields as needed.',
-        [{ text: 'OK' }]
-      );
+      setLastExtractedRecipe(extractedRecipe);
+      
+      // Show success with feedback option
+      // On web, use window.alert for reliability
+      if (typeof window !== 'undefined' && window.alert) {
+        // Web platform - use native browser alert, then show feedback modal
+        window.alert('Recipe extracted! Please review and edit the fields as needed.');
+        // Show feedback modal after a short delay on web
+        setTimeout(() => setShowFeedbackModal(true), 300);
+      } else {
+        // Mobile platform - use button options
+        Alert.alert(
+          'Success',
+          'Recipe extracted! Please review and edit the fields as needed.',
+          [
+            { text: 'Give Feedback', onPress: () => setShowFeedbackModal(true) },
+            { text: 'OK' }
+          ]
+        );
+      }
     } catch (error) {
       console.error('Extraction error:', error);
-      Alert.alert(
-        'Extraction Failed',
-        error.message || 'Failed to extract recipe. Please check your GitHub token in .env file and try again.'
-      );
+      const errorMessage = error.message || 'Failed to extract recipe. Please check your GitHub token in .env file and try again.';
+      
+      setExtractionError({
+        message: errorMessage,
+        canRetry: error.canRetry !== false,
+        lastText: text
+      });
+      
+      // On mobile, also show an alert dialog
+      // On web, we rely on the UI error display which is more reliable
+      if (typeof window === 'undefined' || typeof document === 'undefined') {
+        // Mobile platform - use Alert
+        Alert.alert(
+          'Extraction Failed',
+          errorMessage,
+          error.canRetry !== false 
+            ? [
+                { text: 'Retry', onPress: () => performExtraction(text) },
+                { text: 'Cancel', style: 'cancel' }
+              ]
+            : [{ text: 'OK' }]
+        );
+      }
+      // Web platform - error will be shown in UI via extractionError state
     } finally {
       setExtracting(false);
     }
@@ -1576,6 +1712,33 @@ export default function App() {
         </TouchableOpacity>
         {extracting && <Text style={styles.loadingText}>Extracting recipe using AI...</Text>}
         
+        {/* Error display for extraction failures */}
+        {extractionError && (
+          <View style={{ backgroundColor: '#ffebee', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#f44336' }}>
+            <Text style={{ color: '#c62828', fontWeight: 'bold', marginBottom: 4 }}>❌ Extraction Failed</Text>
+            <Text style={{ color: '#c62828', marginBottom: 8 }}>{extractionError.message}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {extractionError.canRetry && (
+                <TouchableOpacity 
+                  style={{ backgroundColor: '#f44336', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
+                  onPress={() => {
+                    setExtractionError(null);
+                    performExtraction(extractionError.lastText);
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Retry</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                style={{ backgroundColor: '#666', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
+                onPress={() => setExtractionError(null)}
+              >
+                <Text style={{ color: '#fff' }}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        
         <TextInput
           style={styles.input}
           placeholder="Recipe Title"
@@ -1685,6 +1848,68 @@ export default function App() {
                 Paste video description, transcript, or recipe text:
               </Text>
               
+              {/* Extraction History */}
+              {extractionHistory.length > 0 && (
+                <View style={{ marginBottom: 10 }}>
+                  <TouchableOpacity 
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}
+                    onPress={() => setShowHistoryDropdown(!showHistoryDropdown)}
+                  >
+                    <Text style={{ color: '#4CAF50', fontWeight: 'bold' }}>
+                      📜 Recent Extractions ({extractionHistory.length})
+                    </Text>
+                    <Text style={{ color: '#4CAF50', marginLeft: 5 }}>
+                      {showHistoryDropdown ? '▲' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {showHistoryDropdown && (
+                    <View style={{ backgroundColor: '#f5f5f5', borderRadius: 8, padding: 8, maxHeight: 150 }}>
+                      <ScrollView>
+                        {extractionHistory.map((item) => (
+                          <TouchableOpacity 
+                            key={item.id}
+                            style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#ddd' }}
+                            onPress={() => {
+                              setExtractionText(item.fullText);
+                              setShowHistoryDropdown(false);
+                            }}
+                          >
+                            <Text style={{ fontWeight: 'bold', fontSize: 14 }} numberOfLines={1}>
+                              {item.resultTitle || 'Untitled'}
+                            </Text>
+                            <Text style={{ fontSize: 12, color: '#666' }} numberOfLines={1}>
+                              {item.text}...
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                      <TouchableOpacity 
+                        style={{ marginTop: 8, padding: 8, backgroundColor: '#ff6b6b', borderRadius: 4, alignItems: 'center' }}
+                        onPress={() => {
+                          if (typeof window !== 'undefined' && window.confirm) {
+                            if (window.confirm('Are you sure you want to clear extraction history?')) {
+                              clearExtractionHistory();
+                            }
+                          } else {
+                            Alert.alert(
+                              'Clear History',
+                              'Are you sure you want to clear extraction history?',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Clear', style: 'destructive', onPress: clearExtractionHistory }
+                              ]
+                            );
+                          }
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Clear History</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+              
               <TextInput
                 style={styles.modalTextInput}
                 multiline
@@ -1701,6 +1926,7 @@ export default function App() {
                   onPress={() => {
                     setShowExtractionModal(false);
                     setExtractionText('');
+                    setShowHistoryDropdown(false);
                   }}
                 >
                   <Text style={styles.modalButtonText}>Cancel</Text>
@@ -1708,12 +1934,63 @@ export default function App() {
                 
                 <TouchableOpacity 
                   style={[styles.modalButton, styles.modalButtonExtract]} 
-                  onPress={performExtraction}
+                  onPress={() => performExtraction()}
                   disabled={!extractionText.trim()}
                 >
                   <Text style={styles.modalButtonText}>Extract</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Feedback Modal */}
+        <Modal
+          visible={showFeedbackModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowFeedbackModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Was this extraction accurate?</Text>
+              <Text style={styles.modalSubtitle}>
+                Your feedback helps improve our AI extraction.
+              </Text>
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginVertical: 20 }}>
+                <TouchableOpacity 
+                  style={{ padding: 20, backgroundColor: '#4CAF50', borderRadius: 50 }}
+                  onPress={() => saveFeedback(true, feedbackComment)}
+                >
+                  <Text style={{ fontSize: 32 }}>👍</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={{ padding: 20, backgroundColor: '#f44336', borderRadius: 50 }}
+                  onPress={() => saveFeedback(false, feedbackComment)}
+                >
+                  <Text style={{ fontSize: 32 }}>👎</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TextInput
+                style={[styles.input, { marginBottom: 15 }]}
+                placeholder="Optional: Tell us what could be improved..."
+                value={feedbackComment}
+                onChangeText={setFeedbackComment}
+                multiline
+                numberOfLines={3}
+              />
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonCancel, { width: '100%' }]}
+                onPress={() => {
+                  setShowFeedbackModal(false);
+                  setFeedbackComment('');
+                }}
+              >
+                <Text style={styles.modalButtonText}>Skip</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -1932,6 +2209,33 @@ export default function App() {
         </TouchableOpacity>
         {extracting && <Text style={styles.loadingText}>Extracting recipe using AI...</Text>}
         
+        {/* Error display for extraction failures */}
+        {extractionError && (
+          <View style={{ backgroundColor: '#ffebee', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#f44336' }}>
+            <Text style={{ color: '#c62828', fontWeight: 'bold', marginBottom: 4 }}>❌ Extraction Failed</Text>
+            <Text style={{ color: '#c62828', marginBottom: 8 }}>{extractionError.message}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {extractionError.canRetry && (
+                <TouchableOpacity 
+                  style={{ backgroundColor: '#f44336', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
+                  onPress={() => {
+                    setExtractionError(null);
+                    performExtraction(extractionError.lastText);
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Retry</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                style={{ backgroundColor: '#666', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
+                onPress={() => setExtractionError(null)}
+              >
+                <Text style={{ color: '#fff' }}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        
         <TextInput
           style={styles.input}
           placeholder="Recipe Title"
@@ -2041,6 +2345,68 @@ export default function App() {
                 Paste video description, transcript, or recipe text:
               </Text>
               
+              {/* Extraction History */}
+              {extractionHistory.length > 0 && (
+                <View style={{ marginBottom: 10 }}>
+                  <TouchableOpacity 
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}
+                    onPress={() => setShowHistoryDropdown(!showHistoryDropdown)}
+                  >
+                    <Text style={{ color: '#4CAF50', fontWeight: 'bold' }}>
+                      📜 Recent Extractions ({extractionHistory.length})
+                    </Text>
+                    <Text style={{ color: '#4CAF50', marginLeft: 5 }}>
+                      {showHistoryDropdown ? '▲' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {showHistoryDropdown && (
+                    <View style={{ backgroundColor: '#f5f5f5', borderRadius: 8, padding: 8, maxHeight: 150 }}>
+                      <ScrollView>
+                        {extractionHistory.map((item) => (
+                          <TouchableOpacity 
+                            key={item.id}
+                            style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#ddd' }}
+                            onPress={() => {
+                              setExtractionText(item.fullText);
+                              setShowHistoryDropdown(false);
+                            }}
+                          >
+                            <Text style={{ fontWeight: 'bold', fontSize: 14 }} numberOfLines={1}>
+                              {item.resultTitle || 'Untitled'}
+                            </Text>
+                            <Text style={{ fontSize: 12, color: '#666' }} numberOfLines={1}>
+                              {item.text}...
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                      <TouchableOpacity 
+                        style={{ marginTop: 8, padding: 8, backgroundColor: '#ff6b6b', borderRadius: 4, alignItems: 'center' }}
+                        onPress={() => {
+                          if (typeof window !== 'undefined' && window.confirm) {
+                            if (window.confirm('Are you sure you want to clear extraction history?')) {
+                              clearExtractionHistory();
+                            }
+                          } else {
+                            Alert.alert(
+                              'Clear History',
+                              'Are you sure you want to clear extraction history?',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Clear', style: 'destructive', onPress: clearExtractionHistory }
+                              ]
+                            );
+                          }
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Clear History</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+              
               <TextInput
                 style={styles.modalTextInput}
                 multiline
@@ -2057,6 +2423,7 @@ export default function App() {
                   onPress={() => {
                     setShowExtractionModal(false);
                     setExtractionText('');
+                    setShowHistoryDropdown(false);
                   }}
                 >
                   <Text style={styles.modalButtonText}>Cancel</Text>
@@ -2064,12 +2431,63 @@ export default function App() {
                 
                 <TouchableOpacity 
                   style={[styles.modalButton, styles.modalButtonExtract]} 
-                  onPress={performExtraction}
+                  onPress={() => performExtraction()}
                   disabled={!extractionText.trim()}
                 >
                   <Text style={styles.modalButtonText}>Extract</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Feedback Modal */}
+        <Modal
+          visible={showFeedbackModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowFeedbackModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 400 }]}>
+              <Text style={styles.modalTitle}>Was this extraction accurate?</Text>
+              <Text style={styles.modalSubtitle}>
+                Your feedback helps improve our AI extraction.
+              </Text>
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginVertical: 20 }}>
+                <TouchableOpacity 
+                  style={{ padding: 20, backgroundColor: '#4CAF50', borderRadius: 50 }}
+                  onPress={() => saveFeedback(true, feedbackComment)}
+                >
+                  <Text style={{ fontSize: 32 }}>👍</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={{ padding: 20, backgroundColor: '#f44336', borderRadius: 50 }}
+                  onPress={() => saveFeedback(false, feedbackComment)}
+                >
+                  <Text style={{ fontSize: 32 }}>👎</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TextInput
+                style={[styles.input, { marginBottom: 15 }]}
+                placeholder="Optional: Tell us what could be improved..."
+                value={feedbackComment}
+                onChangeText={setFeedbackComment}
+                multiline
+                numberOfLines={3}
+              />
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonCancel, { width: '100%' }]}
+                onPress={() => {
+                  setShowFeedbackModal(false);
+                  setFeedbackComment('');
+                }}
+              >
+                <Text style={styles.modalButtonText}>Skip</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
