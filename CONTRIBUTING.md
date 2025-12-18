@@ -31,6 +31,39 @@
 - ✅ No merge conflicts
 - ✅ Tests included and passing
 - ✅ Security audit passing
+- ✅ **Manual testing completed** (see below)
+
+## Manual Testing Before Merge
+
+### Required for User-Facing Changes
+Before merging any PR that affects user-visible functionality:
+
+1. **Web Testing**
+   - Run `npm run web` and test the feature in browser
+   - Verify the UI renders correctly
+   - Test user interactions (buttons, forms, modals)
+
+2. **Mobile Testing (Android/iOS)**
+   - Run `npx expo start` and connect via Expo Go
+   - Test on actual device or emulator
+   - Verify native components work correctly
+   - Test file pickers, alerts, and platform-specific features
+
+3. **User Review Checklist**
+   - [ ] Feature is visible and accessible in the app
+   - [ ] UI matches expected design/behavior
+   - [ ] No console errors or warnings
+   - [ ] Feature works on target platforms (web/Android/iOS)
+   - [ ] Edge cases handled gracefully
+
+4. **Document Test Results**
+   - Note any issues found during testing
+   - Confirm user sign-off before merge
+
+### Exceptions
+- Documentation-only changes
+- Test-only changes (no UI impact)
+- CI/CD configuration changes
 
 ## Reporting Issues
 - Check if issue already exists

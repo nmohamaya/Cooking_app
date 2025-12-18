@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { extractRecipeFromText } from './services/recipeExtraction';
 import { checkForDuplicate, formatDuplicateMessage } from './services/recipeComparison';
 import { Picker } from '@react-native-picker/picker';
@@ -973,8 +974,30 @@ export default function App() {
       };
       input.click();
     } else {
-      // Mobile: show paste modal
-      setShowImportModal(true);
+      // Mobile: use document picker to select file
+      try {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: 'application/json',
+          copyToCacheDirectory: true,
+        });
+        
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const asset = result.assets[0];
+          const fileContent = await FileSystem.readAsStringAsync(asset.uri);
+          const data = JSON.parse(fileContent);
+          
+          if (data.recipes && Array.isArray(data.recipes)) {
+            const imported = data.recipes.filter(r => r.id && r.title);
+            saveRecipes([...recipes, ...imported]);
+            Alert.alert('Success', `Imported ${imported.length} recipes!`);
+          } else {
+            Alert.alert('Error', 'Invalid format. Expected JSON with "recipes" array.');
+          }
+        }
+      } catch (error) {
+        console.error('Import error:', error);
+        Alert.alert('Error', 'Failed to import file. Please ensure it is a valid JSON file.');
+      }
     }
   };
 
@@ -1194,6 +1217,7 @@ export default function App() {
           horizontal 
           showsHorizontalScrollIndicator={false}
           style={styles.categoryFilterContainer}
+          contentContainerStyle={{ alignItems: 'center', paddingRight: 10 }}
         >
           <TouchableOpacity
             style={[
@@ -1503,26 +1527,26 @@ export default function App() {
                 {duplicateInfo ? formatDuplicateMessage(duplicateInfo) : ''}
               </Text>
               
-              <View style={{ gap: 10 }}>
+              <View>
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#4CAF50', width: '100%' }]} 
+                  style={{ backgroundColor: '#4CAF50', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateAddAsVariant}
                 >
-                  <Text style={styles.modalButtonText}>Add as Variant</Text>
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add as Variant</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#2196F3', width: '100%' }]} 
+                  style={{ backgroundColor: '#2196F3', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateAddAnyway}
                 >
-                  <Text style={styles.modalButtonText}>Add Anyway</Text>
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add Anyway</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.modalButton, styles.modalButtonCancel, { width: '100%' }]} 
+                  style={{ backgroundColor: '#666666', width: '100%', padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateCancel}
                 >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1708,26 +1732,26 @@ export default function App() {
                 {duplicateInfo ? formatDuplicateMessage(duplicateInfo) : ''}
               </Text>
               
-              <View style={{ gap: 10 }}>
+              <View>
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#4CAF50', width: '100%' }]} 
+                  style={{ backgroundColor: '#4CAF50', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateAddAsVariant}
                 >
-                  <Text style={styles.modalButtonText}>Add as Variant</Text>
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add as Variant</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#2196F3', width: '100%' }]} 
+                  style={{ backgroundColor: '#2196F3', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateAddAnyway}
                 >
-                  <Text style={styles.modalButtonText}>Add Anyway</Text>
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add Anyway</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.modalButton, styles.modalButtonCancel, { width: '100%' }]} 
+                  style={{ backgroundColor: '#666666', width: '100%', padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateCancel}
                 >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -2496,7 +2520,7 @@ const styles = StyleSheet.create({
   categoryFilterContainer: {
     flexDirection: 'row',
     marginBottom: 10,
-    maxHeight: 44,
+    minHeight: 44,
   },
   categoryFilterButton: {
     backgroundColor: '#f5f5f5',
@@ -2506,6 +2530,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderWidth: 1,
     borderColor: '#ddd',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   categoryFilterButtonActive: {
     backgroundColor: '#2196F3',
@@ -2514,6 +2540,7 @@ const styles = StyleSheet.create({
   categoryFilterButtonText: {
     fontSize: 14,
     color: '#666',
+    textAlign: 'center',
   },
   categoryFilterButtonTextActive: {
     color: '#fff',
