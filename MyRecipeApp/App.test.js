@@ -445,3 +445,176 @@ describe('Recipe Categories and Tags Feature', () => {
   });
 });
 
+/**
+ * Tests for Duplicate Recipe Detection Feature
+ */
+describe('Duplicate Recipe Detection Feature', () => {
+  // Import the comparison functions for testing
+  const { 
+    calculateStringSimilarity, 
+    compareIngredients, 
+    checkForDuplicate,
+    formatDuplicateMessage 
+  } = require('./services/recipeComparison');
+
+  describe('String Similarity Calculation', () => {
+    it('should return 1 for identical strings', () => {
+      expect(calculateStringSimilarity('Chicken Curry', 'Chicken Curry')).toBe(1);
+    });
+
+    it('should return 1 for case-insensitive identical strings', () => {
+      expect(calculateStringSimilarity('CHICKEN CURRY', 'chicken curry')).toBe(1);
+    });
+
+    it('should return 0 for empty strings', () => {
+      expect(calculateStringSimilarity('', 'test')).toBe(0);
+      expect(calculateStringSimilarity('test', '')).toBe(0);
+    });
+
+    it('should return 0 for null/undefined inputs', () => {
+      expect(calculateStringSimilarity(null, 'test')).toBe(0);
+      expect(calculateStringSimilarity('test', undefined)).toBe(0);
+    });
+
+    it('should calculate similarity for partially matching titles', () => {
+      const similarity = calculateStringSimilarity('Chicken Curry', 'Chicken Tikka');
+      expect(similarity).toBeGreaterThan(0);
+      expect(similarity).toBeLessThan(1);
+    });
+
+    it('should give high similarity for very similar titles', () => {
+      const similarity = calculateStringSimilarity('Grilled Chicken', 'Grilled Chicken Breast');
+      expect(similarity).toBeGreaterThan(0.5);
+    });
+  });
+
+  describe('Ingredient Comparison', () => {
+    it('should return 0 for empty ingredient lists', () => {
+      expect(compareIngredients([], ['chicken'])).toBe(0);
+      expect(compareIngredients(['chicken'], [])).toBe(0);
+    });
+
+    it('should return high similarity for matching ingredients', () => {
+      const ingredients1 = ['2 cups chicken', '1 tbsp oil', 'salt'];
+      const ingredients2 = ['chicken breast', 'vegetable oil', 'salt and pepper'];
+      const similarity = compareIngredients(ingredients1, ingredients2);
+      expect(similarity).toBeGreaterThan(0.3);
+    });
+
+    it('should handle ingredients with different quantities', () => {
+      const ingredients1 = ['1 cup flour'];
+      const ingredients2 = ['2 cups flour'];
+      const similarity = compareIngredients(ingredients1, ingredients2);
+      expect(similarity).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Duplicate Detection', () => {
+    const existingRecipes = [
+      {
+        id: '1',
+        title: 'Chicken Curry',
+        ingredients: ['2 lbs chicken', 'curry powder', 'coconut milk', 'onions'],
+      },
+      {
+        id: '2',
+        title: 'Beef Stew',
+        ingredients: ['beef chunks', 'potatoes', 'carrots', 'beef broth'],
+      },
+      {
+        id: '3',
+        title: 'Vegetable Stir Fry',
+        ingredients: ['broccoli', 'bell peppers', 'soy sauce', 'garlic'],
+      },
+    ];
+
+    it('should detect exact title match', () => {
+      const newRecipe = { title: 'Chicken Curry', ingredients: [] };
+      const result = checkForDuplicate(newRecipe, existingRecipes);
+      expect(result).not.toBeNull();
+      expect(result.recipe.id).toBe('1');
+    });
+
+    it('should detect similar titles', () => {
+      const newRecipe = { title: 'Chicken Curry Masala', ingredients: [] };
+      const result = checkForDuplicate(newRecipe, existingRecipes);
+      expect(result).not.toBeNull();
+      expect(result.recipe.id).toBe('1');
+    });
+
+    it('should return null for unique recipes', () => {
+      const newRecipe = { title: 'Chocolate Cake', ingredients: ['flour', 'chocolate', 'eggs'] };
+      const result = checkForDuplicate(newRecipe, existingRecipes);
+      expect(result).toBeNull();
+    });
+
+    it('should return null for empty recipe list', () => {
+      const newRecipe = { title: 'Test Recipe', ingredients: [] };
+      const result = checkForDuplicate(newRecipe, []);
+      expect(result).toBeNull();
+    });
+
+    it('should include similarity scores in result', () => {
+      const newRecipe = { 
+        title: 'Chicken Curry', 
+        ingredients: ['chicken', 'curry', 'coconut milk'] 
+      };
+      const result = checkForDuplicate(newRecipe, existingRecipes);
+      expect(result).toHaveProperty('titleSimilarity');
+      expect(result).toHaveProperty('ingredientSimilarity');
+      expect(result).toHaveProperty('combinedScore');
+      expect(result).toHaveProperty('matchType');
+    });
+
+    it('should identify exact matches', () => {
+      const newRecipe = { title: 'Chicken Curry', ingredients: [] };
+      const result = checkForDuplicate(newRecipe, existingRecipes);
+      expect(result.matchType).toBe('exact');
+    });
+  });
+
+  describe('Duplicate Message Formatting', () => {
+    it('should format message for exact match', () => {
+      const duplicateInfo = {
+        recipe: { title: 'Chicken Curry' },
+        matchType: 'exact',
+        combinedScore: 0.95,
+      };
+      const message = formatDuplicateMessage(duplicateInfo);
+      expect(message).toContain('Chicken Curry');
+      expect(message).toContain('95%');
+    });
+
+    it('should format message for similar match', () => {
+      const duplicateInfo = {
+        recipe: { title: 'Beef Stew' },
+        matchType: 'similar',
+        combinedScore: 0.75,
+      };
+      const message = formatDuplicateMessage(duplicateInfo);
+      expect(message).toContain('Beef Stew');
+      expect(message).toContain('75%');
+    });
+
+    it('should return empty string for null input', () => {
+      expect(formatDuplicateMessage(null)).toBe('');
+    });
+  });
+
+  describe('Variant Recipe Creation', () => {
+    it('should add variantOf property when marked as variant', () => {
+      const originalRecipe = { id: '123', title: 'Chicken Curry' };
+      const newRecipe = { title: 'Chicken Curry', ingredients: 'different' };
+      
+      const variantRecipe = {
+        ...newRecipe,
+        id: String(Date.now()),
+        variantOf: originalRecipe.id,
+        title: `${newRecipe.title} (Variant)`,
+      };
+
+      expect(variantRecipe.variantOf).toBe('123');
+      expect(variantRecipe.title).toBe('Chicken Curry (Variant)');
+    });
+  });
+});
