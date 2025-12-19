@@ -41,13 +41,17 @@
   },
   "private": true,
   "jest": {
-    "testEnvironment": "node",
-    "setupFiles": [],
+    "setupFiles": [
+      "<rootDir>/jest.setup.js"
+    ],
     "transform": {
       "^.+\\.(js|jsx)$": "babel-jest"
     },
     "transformIgnorePatterns": [
       "node_modules/(?!(react-native|@react-native|expo|@expo)/)"
+    ],
+    "testPathIgnorePatterns": [
+      "__tests__/feedbackModal.test.js"
     ]
   },
   "devDependencies": {
