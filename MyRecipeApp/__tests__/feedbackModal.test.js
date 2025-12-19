@@ -61,7 +61,7 @@ const saveFeedback = async (isPositive, comment = '', lastExtractedRecipe = null
 describe('Feedback Modal Logic', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset Date.now() for consistent timestamps in tests
+    // Mock Date.now() for consistent IDs in tests
     jest.spyOn(Date, 'now').mockReturnValue(1234567890000);
   });
 
