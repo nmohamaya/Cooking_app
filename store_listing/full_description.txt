@@ -1,0 +1,59 @@
+MyRecipeApp is your intelligent cooking companion designed to make recipe management and meal preparation effortless. Extract recipes with AI, manage cooking timers, and get feedback-driven improvements.
+
+🤖 **AI Recipe Extraction**
+Simply paste or type recipe text, and our AI-powered extraction instantly converts it into a structured recipe. Perfect for:
+- Converting recipe websites to organized format
+- Organizing handwritten or printed recipes
+- Quick recipe importing from any source
+- No more messy, unstructured recipe notes
+
+⏱️ **Multi-Timer Widget**
+Never miss a cooking step again with our intuitive multi-timer feature:
+- Set multiple timers for different cooking tasks
+- Clear labels and visual indicators
+- Persistent timers (continue even when app is minimized)
+- Perfect for managing complex multi-step recipes
+
+📝 **Recipe Management**
+Keep your recipes organized and accessible:
+- Save extracted recipes for future use
+- Edit and customize recipes
+- Delete unwanted recipes
+- Quick access to your favorite recipes
+
+💬 **Feedback System**
+Help us improve recipe extraction:
+- Report extraction errors
+- Suggest improvements
+- Rate recipe accuracy
+- Direct feedback improves our AI model
+
+🔒 **Privacy First**
+- All your recipes are stored locally on your device
+- Your data never leaves your phone
+- No account required
+- No ads or data collection for marketing
+
+✨ **Key Features**
+- Fast AI-powered recipe extraction
+- Intuitive recipe management interface
+- Reliable multi-step cooking timers
+- Beautiful and responsive design
+- Offline functionality
+- Privacy-focused (local storage only)
+
+**Perfect for:**
+- Home cooks managing multiple recipes
+- People who collect recipes from various sources
+- Anyone who needs reliable cooking timers
+- Those who value privacy and data security
+
+Whether you're a beginner cook or an experienced chef, MyRecipeApp makes recipe management and cooking preparation simple and enjoyable.
+
+**Download MyRecipeApp today** and transform how you manage and cook recipes!
+
+---
+
+**Privacy:** Your recipes and data remain on your device. See our privacy policy for details: https://github.com/nmohamaya/Cooking_app/blob/main/docs/PRIVACY_POLICY.md
+
+**Questions?** Contact us at: privacy@myrecipeapp.com
