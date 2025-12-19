@@ -121,7 +121,7 @@ graph TD
     D --> E[4b. Write Unit Tests for new functionality]
     E --> F[4c. Run tests locally - npm test]
     F --> G[5. Push & Create PR with 'Closes #N']
-    G --> H[5b. Create Test Issue for manual testing in Backlog]
+    G --> H[5b. Create Test Issue for manual testing]
     H --> I[5c. Set Issue Status to 'In Review']
     I --> J[6. CI/CD Checks Pass]
     J --> K[7. Merge PR - Issue auto-closes]
@@ -130,6 +130,27 @@ graph TD
     M --> N[9. Delete local branch]
     N --> O[10. Complete Test Issue when ready]
 ```
+
+#### Step 5b: Create Test Issue for Manual Testing
+**IMPORTANT: This is a REQUIRED step before marking PR as "In Review"**
+
+Test issues are separate GitHub issues created for manual QA validation:
+- **Title:** `Test Issue #N: Manual Testing - [Feature Name]`
+- **Labels:** `P1`, `size: S`, `test-case`
+- **Status:** Place in "Backlog" initially
+- **Content:** Include:
+  - Prerequisites (PR must be merged)
+  - Comprehensive test case checklist
+  - Acceptance criteria
+  - Edge cases to verify
+  - Performance benchmarks if applicable
+- **Link to implementation:** Reference the related PR and original issue in the test issue body
+
+**Example test issues:**
+- Test Issue #84: Manual Testing - Link validation and parsing service (for Issue #75)
+- Test Issue #85: Manual Testing - YouTube transcript extraction service (for Issue #76)
+
+Once manual QA is complete, the test issue is marked as "Done".
 
 **Priority Labels:**
 - `P0` - Critical/Blocking (fix immediately)
