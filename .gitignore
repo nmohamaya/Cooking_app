@@ -1,0 +1,51 @@
+# Secrets and sensitive files
+*.keystore
+*.jks
+*.key
+.env
+.env.local
+.env.*.local
+
+# Credentials and tokens
+KEYSTORE_PASSWORD.txt
+credentials.json
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+.jest/
+
+# Build outputs
+build/
+dist/
+*.apk
+*.aab
+
+# Expo
+.expo/
+.expo-shared/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+.DS_Store
