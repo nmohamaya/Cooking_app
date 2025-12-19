@@ -38,6 +38,7 @@ export default function App() {
   const [extractionError, setExtractionError] = useState(null); // { message, canRetry }
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [lastExtractedRecipe, setLastExtractedRecipe] = useState(null);
+  const [wasExtracted, setWasExtracted] = useState(false); // Track if current recipe was created via extraction
   const [feedbackComment, setFeedbackComment] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importText, setImportText] = useState('');
@@ -433,6 +434,7 @@ export default function App() {
       // Close modal first, then show thank you message
       setShowFeedbackModal(false);
       setFeedbackComment('');
+      setWasExtracted(false); // Clear flag after feedback
       
       // Show thank you message - use window.alert on web for reliability
       setTimeout(() => {
@@ -557,6 +559,11 @@ export default function App() {
     }
     
     saveRecipes([...recipes, newRecipe]);
+    // If recipe was created via extraction, show feedback modal
+    if (wasExtracted) {
+      setShowFeedbackModal(true);
+      setWasExtracted(false);
+    }
     resetForm();
     setScreen('home');
   };
@@ -638,6 +645,7 @@ export default function App() {
   const resetForm = () => {
     setForm({ title: '', category: 'Dinner', tags: [], ingredients: '', instructions: '', prepTime: '', cookTime: '', imageUri: '', videoUrl: '' });
     setSelectedRecipe(null);
+    setWasExtracted(false); // Clear flag on form reset
   };
 
   // Helper function to parse time strings (e.g., "15 minutes", "1 hour", "30 min")
@@ -859,7 +867,7 @@ export default function App() {
     // Remove parenthetical notes (e.g., "about 3 large eggs", "room temperature")
     name = name.replace(/\([^)]*\)/g, '').trim();
     
-    // Remove preparation notes after commas (e.g., "sifted", "chopped", "minced")
+    // Remove preparation notes after commas (e.g., "sifted", "chopped", "minced", "diced", "cubed", "finely chopped", "at room temperature", "softened", "melted", "beaten", "whisked")
     name = name.replace(/,\s*(sifted|chopped|minced|diced|sliced|cubed|finely chopped|at room temperature|softened|melted|beaten|whisked).*$/i, '').trim();
     
     // Remove common trailing preparation phrases
@@ -1271,14 +1279,9 @@ export default function App() {
     setShowExtractionModal(false);
     setExtracting(true);
     setExtractionError(null);
-    
     try {
       const extractedRecipe = await extractRecipeFromText(text);
-      
-      // Save to extraction history
       await saveExtractionToHistory(text, extractedRecipe);
-      
-      // Merge extracted data with existing form data (keep videoUrl and imageUri)
       setForm({
         ...form,
         title: extractedRecipe.title || form.title,
@@ -1288,27 +1291,14 @@ export default function App() {
         prepTime: extractedRecipe.prepTime || form.prepTime,
         cookTime: extractedRecipe.cookTime || form.cookTime,
       });
-
       setExtractionText('');
       setLastExtractedRecipe(extractedRecipe);
-      
-      // Show success with feedback option
-      // On web, use window.alert for reliability
+      setWasExtracted(true); // Mark that the next save should trigger feedback
+      // Show success message only
       if (typeof window !== 'undefined' && window.alert) {
-        // Web platform - use native browser alert, then show feedback modal
         window.alert('Recipe extracted! Please review and edit the fields as needed.');
-        // Show feedback modal after a short delay on web
-        setTimeout(() => setShowFeedbackModal(true), 300);
       } else {
-        // Mobile platform - use button options
-        Alert.alert(
-          'Success',
-          'Recipe extracted! Please review and edit the fields as needed.',
-          [
-            { text: 'Give Feedback', onPress: () => setShowFeedbackModal(true) },
-            { text: 'OK' }
-          ]
-        );
+        Alert.alert('Success', 'Recipe extracted! Please review and edit the fields as needed.');
       }
     } catch (error) {
       console.error('Extraction error:', error);
@@ -2047,7 +2037,7 @@ export default function App() {
           onCreateCustom={() => setShowCreateTimer(true)}
           recipeTitle={timerForRecipe?.title}
         />
-      </View>
+      </ScrollView>
     );
   }
 
@@ -2393,6 +2383,58 @@ export default function App() {
             </View>
           </View>
         </Modal>
+
+        {/* Timer Floating Widget */}
+        <FloatingTimerWidget
+          timers={timers}
+          visible={!showTimerWidget && getRunningTimersCount() > 0}
+          onPress={() => setShowTimerWidget(true)}
+        />
+
+        {/* Timer Widget Modal */}
+        <TimerWidgetModal
+          visible={showTimerWidget}
+          onClose={() => setShowTimerWidget(false)}
+          timers={timers}
+          onStartTimer={startTimer}
+          onPauseTimer={pauseTimer}
+          onResumeTimer={resumeTimer}
+          onCancelTimer={cancelTimer}
+          onAddTime={addTimeToTimer}
+          onDismissCompleted={dismissCompletedTimer}
+          onCreateNew={() => {
+            setShowTimerWidget(false);
+            setShowCreateTimer(true);
+          }}
+        />
+
+        {/* Create Timer Modal */}
+        <CreateTimerModal
+          visible={showCreateTimer}
+          onClose={() => {
+            setShowCreateTimer(false);
+            setTimerForRecipe(null);
+            setNewTimerForm({ hours: 0, minutes: 5, seconds: 0, label: '' });
+          }}
+          onCreate={createNewTimer}
+          timerForm={newTimerForm}
+          setTimerForm={setNewTimerForm}
+          recipeContext={timerForRecipe}
+        />
+
+        {/* Timer Suggestions Modal */}
+        <TimerSuggestionsModal
+          visible={showTimerSuggestions}
+          onClose={() => {
+            setShowTimerSuggestions(false);
+            setTimerForRecipe(null);
+            setSuggestedTimers([]);
+          }}
+          suggestions={suggestedTimers}
+          onAddSuggestion={addSuggestedTimer}
+          onCreateCustom={() => setShowCreateTimer(true)}
+          recipeTitle={timerForRecipe?.title}
+        />
       </ScrollView>
     );
   }
@@ -2910,31 +2952,97 @@ export default function App() {
           </View>
         </Modal>
 
-        {/* Duplicate Recipe Modal */}
+        {/* Duplicate Recipe Detection Modal */}
         <Modal
           visible={showDuplicateModal}
           transparent={true}
           animationType="fade"
-          onRequestClose={() => setShowDuplicateModal(false)}
+          onRequestClose={handleDuplicateCancel}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxWidth: 400 }]}>
-              <Text style={styles.modalTitle}>Already Added</Text>
-              <Text style={[styles.modalSubtitle, { marginBottom: 25 }]}>
-                "{duplicateRecipeTitle}" has already been added to your shopping list.
+            <View style={[styles.modalContent, { maxWidth: 450 }]}>
+              <Text style={styles.modalTitle}>⚠️ Similar Recipe Found</Text>
+              <Text style={[styles.modalSubtitle, { marginBottom: 15 }]}>
+                {duplicateInfo ? formatDuplicateMessage(duplicateInfo) : ''}
               </Text>
               
-              <View style={styles.modalButtons}>
+              <View>
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#2196F3' }]} 
-                  onPress={() => setShowDuplicateModal(false)}
+                  style={{ backgroundColor: '#4CAF50', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  onPress={handleDuplicateAddAsVariant}
                 >
-                  <Text style={styles.modalButtonText}>OK</Text>
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add as Variant</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={{ backgroundColor: '#2196F3', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  onPress={handleDuplicateAddAnyway}
+                >
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add Anyway</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={{ backgroundColor: '#666666', width: '100%', padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  onPress={handleDuplicateCancel}
+                >
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
         </Modal>
+
+        {/* Timer Floating Widget */}
+        <FloatingTimerWidget
+          timers={timers}
+          visible={!showTimerWidget && getRunningTimersCount() > 0}
+          onPress={() => setShowTimerWidget(true)}
+        />
+
+        {/* Timer Widget Modal */}
+        <TimerWidgetModal
+          visible={showTimerWidget}
+          onClose={() => setShowTimerWidget(false)}
+          timers={timers}
+          onStartTimer={startTimer}
+          onPauseTimer={pauseTimer}
+          onResumeTimer={resumeTimer}
+          onCancelTimer={cancelTimer}
+          onAddTime={addTimeToTimer}
+          onDismissCompleted={dismissCompletedTimer}
+          onCreateNew={() => {
+            setShowTimerWidget(false);
+            setShowCreateTimer(true);
+          }}
+        />
+
+        {/* Create Timer Modal */}
+        <CreateTimerModal
+          visible={showCreateTimer}
+          onClose={() => {
+            setShowCreateTimer(false);
+            setTimerForRecipe(null);
+            setNewTimerForm({ hours: 0, minutes: 5, seconds: 0, label: '' });
+          }}
+          onCreate={createNewTimer}
+          timerForm={newTimerForm}
+          setTimerForm={setNewTimerForm}
+          recipeContext={timerForRecipe}
+        />
+
+        {/* Timer Suggestions Modal */}
+        <TimerSuggestionsModal
+          visible={showTimerSuggestions}
+          onClose={() => {
+            setShowTimerSuggestions(false);
+            setTimerForRecipe(null);
+            setSuggestedTimers([]);
+          }}
+          suggestions={suggestedTimers}
+          onAddSuggestion={addSuggestedTimer}
+          onCreateCustom={() => setShowCreateTimer(true)}
+          recipeTitle={timerForRecipe?.title}
+        />
       </ScrollView>
     );
   }

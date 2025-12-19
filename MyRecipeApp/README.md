@@ -484,3 +484,32 @@ node test-all-transcripts.js
 ## Support
 
 For issues and questions, please create a GitHub issue using the appropriate template.
+
+### Handling Failing Tests
+
+#### 1. Create a Test Issue for Failing Tests
+- **Title:** Use a clear title like `[Test Failure] <Test Name>`
+- **Body:** Include the following details:
+  - Test name and file
+  - Error message or stack trace
+  - Steps to reproduce
+  - Any relevant logs or screenshots
+  - Suggested next steps (e.g., skip test, fix infra, etc.)
+- **Labels:**
+  - **Type:** `test-infra`
+  - **Priority:** `P0`, `P1`, or `P2` based on urgency
+  - **Size:** Estimate effort to fix (e.g., `size: S`)
+- **Assign:** Assign to the relevant team member
+- **Project Fields:** Set Priority and Size in the project board
+
+#### 2. Skip the Failing Test (if necessary)
+- Use `test.skip` or `describe.skip` to temporarily disable the test.
+- Add a comment linking to the Test Issue (e.g., `// Skipped due to Issue #42`).
+
+#### 3. Document the Test Issue in the PR
+- Reference the Test Issue in the PR description (e.g., `Related to #42`).
+- Ensure the PR includes any necessary changes to keep CI/CD green.
+
+#### 4. Resolve the Test Issue
+- Once the test is fixed, re-enable it and verify it passes.
+- Close the Test Issue and update the PR/commit history if needed.

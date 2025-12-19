@@ -23,3 +23,5 @@ jest.mock('react-native/Libraries/Interaction/InteractionManager', () => ({
   clearInteractionHandle: jest.fn(),
   setDeadline: jest.fn(),
 }));
+
+global.__DEV__ = true;

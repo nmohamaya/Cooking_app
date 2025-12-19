@@ -41,8 +41,9 @@
   },
   "private": true,
   "jest": {
-    "testEnvironment": "node",
-    "setupFiles": [],
+    "setupFiles": [
+      "<rootDir>/jest.setup.js"
+    ],
     "transform": {
       "^.+\\.(js|jsx)$": "babel-jest"
     },
