@@ -1,8 +1,24 @@
 # Cooking App - Android Play Store Launch Roadmap
 
 **Goal:** Launch MyRecipeApp to Android Play Store
-**Current Status:** MVP COMPLETE! 🎉 19 of 23 issues CLOSED. Ready for final quality polish and Play Store preparation.
-**Last Updated:** December 19, 2025 (Updated)
+**Current Status:** Strategic Decision: Adding meal planning features before launch for competitive advantage
+**Last Updated:** December 19, 2025 (REVISED - Added Meal Planning Features)
+
+## 🔄 ROADMAP UPDATE: Enhanced Feature Set Before Launch
+
+After completing the MVP + launch preparation, we've decided to add 3 significant features that will make the app much more competitive:
+
+### New Features (Issues #65-67):
+1. **Issue #65** - Meal planning (assign recipes to days/meal types) - P1, Size: L
+2. **Issue #66** - Weekly meal view UI - P1, Size: L  
+3. **Issue #67** - Enhanced shopping list (weekly/daily filtering) - P1, Size: XL
+
+**Rationale:** These features transform the app from "recipe manager" to "weekly meal planner" - a complete meal planning solution.
+
+**Impact on Timeline:**
+- Original MVP Launch: ~2-3 weeks
+- **With New Features: ~4-5 weeks** (add 2 weeks for feature development)
+- **New Target Launch: Early-Mid January 2026**
 
 ---
 
@@ -48,17 +64,17 @@
 - **Issue #1** - Foundation of app ✅ CLOSED
 
 ### 🔧 IN PROGRESS / REMAINING
-- **Issue #42** - [Test Infra] Jest/React Native test environment - **P2, Size: S** - IN PROGRESS
-  - Needed for reliable CI/CD
-  - Currently working on fix
+- **Issue #42** - [Test Infra] Jest/React Native test environment - **P2, Size: S** - ✅ CLOSED
+  - Fixed with enhanced jest.setup.js
+  - All 101 tests now passing
 
 ### 📋 PENDING TESTING
 - **Issue #44** - Manual testing: Feedback modal UX *(P1, Size: S)* - BACKLOG
 - **Issue #41** - Manual testing: Multi-timer widget *(Size: M)* - BACKLOG
 
-**Phase 1 Status:** ✅ 92% COMPLETE (19/23 issues done!)
-**Remaining Effort:** ~2-3 days to complete testing and test infra fix
-**Outcome:** All critical bugs fixed, CI/CD reliable, core features stable
+**Phase 1 Status:** ✅ 100% COMPLETE (23/23 issues done!)
+**Remaining Effort:** Manual testing completion (user responsibility)
+**Outcome:** All bugs fixed, CI/CD reliable, core features stable
 
 ---
 
@@ -81,6 +97,60 @@ All essential features have been completed and closed:
 **Outcome:** Feature-complete MVP ready for Play Store
 
 ---
+
+## ✨ Phase 3: ENHANCED FEATURES (NEW ADDITION - Dec 19, 2025!)
+
+After MVP completion, we're adding 3 powerful features to increase competitive advantage:
+
+### 🆕 Meal Planning System (NEW FEATURES)
+
+**Issue #65 - Meal Planning Feature** (P1, Size: L)
+- Assign recipes to specific days (Mon-Sun) and meal types (breakfast/lunch/dinner/snacks)
+- Persist meal plans to AsyncStorage
+- Quick add options for common scenarios
+- **Effort:** ~3-5 days
+- **Dependency:** None - can start immediately
+
+**Issue #66 - Weekly Meal View UI** (P1, Size: L)
+- Intuitive visual display of entire week's meals
+- 7-day grid or card layout showing all meal types
+- Navigate between weeks
+- Quick "Cook Now" for today's meals
+- **Effort:** ~3-5 days
+- **Dependency:** Issue #65 (data model)
+
+**Issue #67 - Enhanced Shopping List** (P1, Size: XL)
+- Generate shopping lists filtered by:
+  - Entire week
+  - Specific day
+  - Custom date range
+  - Meal type
+- Aggregate ingredient quantities
+- Group by category
+- Mark items as purchased
+- **Effort:** ~5+ days
+- **Dependency:** Issue #65 (meal plan data)
+
+### Why Add These?
+
+✅ **Competitive Advantage:** Transforms app from "recipe collector" to "complete meal planner"
+✅ **Better UX:** Users see how recipes work together in meal plan
+✅ **Increased Retention:** Planning feature creates recurring app usage
+✅ **Play Store Appeal:** Meal planning is highly sought category
+
+### Timeline Impact
+
+- **Phase 3 Duration:** 2 weeks (parallel development possible)
+- **New Launch Target:** Early-Mid January 2026
+- **Development Order:** #65 → #66 (parallel with #67) → #67
+
+**Phase 3 Status:** 🔄 NOT STARTED (Queued to start after manual testing)
+**Priority:** P1 (High priority features)
+**Outcome:** Feature-rich app with competitive edge
+
+---
+
+## 📦 Phase 4: Launch Preparation (IN PROGRESS - Dec 19)
 
 ## 📦 Phase 3: Launch Preparation (NEXT - Week 1)
 
