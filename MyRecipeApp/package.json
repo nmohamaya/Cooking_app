@@ -49,9 +49,6 @@
     },
     "transformIgnorePatterns": [
       "node_modules/(?!(react-native|@react-native|expo|@expo)/)"
-    ],
-    "testPathIgnorePatterns": [
-      "__tests__/feedbackModal.test.js"
     ]
   },
   "devDependencies": {
