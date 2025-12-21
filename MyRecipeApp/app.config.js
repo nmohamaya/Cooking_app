@@ -17,6 +17,8 @@ export default {
       supportsTablet: true,
     },
     android: {
+      package: "com.cookingapp.myrecipeapp",
+      versionCode: 1,
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#ffffff',
@@ -27,6 +29,9 @@ export default {
     },
     extra: {
       githubToken: process.env.GITHUB_TOKEN,
+      eas: {
+        projectId: "41ca11bf-7f02-4bd4-94c7-1ea1405446be"
+      }
     },
   },
 };
