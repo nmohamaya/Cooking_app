@@ -8,7 +8,6 @@
 
 # Credentials and tokens
 KEYSTORE_PASSWORD.txt
-credentials.json
 
 # Dependencies
 node_modules/
