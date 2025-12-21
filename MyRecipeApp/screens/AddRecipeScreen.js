@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRecipes } from '../contexts/RecipeContext';
+import RecipeLinkExtractionModal from '../components/RecipeLinkExtractionModal';
 
 const AddRecipeScreen = ({ navigation }) => {
   const { addRecipe } = useRecipes();
@@ -10,6 +11,7 @@ const AddRecipeScreen = ({ navigation }) => {
   const [instructions, setInstructions] = useState('');
   const [prepTime, setPrepTime] = useState('');
   const [cookTime, setCookTime] = useState('');
+  const [extractionModalVisible, setExtractionModalVisible] = useState(false);
 
   const handleSave = () => {
     if (!title.trim()) {
@@ -30,9 +32,32 @@ const AddRecipeScreen = ({ navigation }) => {
     navigation.goBack();
   };
 
+  const handleExtractComplete = (extractedRecipe) => {
+    // Auto-fill fields from extracted recipe
+    setTitle(extractedRecipe.title || '');
+    setCategory(extractedRecipe.category || '');
+    setIngredients(extractedRecipe.ingredients || '');
+    setInstructions(extractedRecipe.instructions || '');
+    setPrepTime(extractedRecipe.prepTime || '');
+    setCookTime(extractedRecipe.cookTime || '');
+  };
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.header}>Add New Recipe</Text>
+
+      <TouchableOpacity
+        style={styles.extractButton}
+        onPress={() => setExtractionModalVisible(true)}
+      >
+        <Text style={styles.extractButtonIcon}>🔗</Text>
+        <View style={styles.extractButtonContent}>
+          <Text style={styles.extractButtonTitle}>Extract from Link</Text>
+          <Text style={styles.extractButtonSubtitle}>
+            YouTube, TikTok, Instagram, or blog
+          </Text>
+        </View>
+      </TouchableOpacity>
 
       <TextInput
         style={styles.input}
@@ -83,6 +108,12 @@ const AddRecipeScreen = ({ navigation }) => {
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Save Recipe</Text>
       </TouchableOpacity>
+
+      <RecipeLinkExtractionModal
+        visible={extractionModalVisible}
+        onClose={() => setExtractionModalVisible(false)}
+        onExtractComplete={handleExtractComplete}
+      />
     </ScrollView>
   );
 };
@@ -98,6 +129,34 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#333',
+  },
+  extractButton: {
+    flexDirection: 'row',
+    backgroundColor: '#e3f2fd',
+    borderWidth: 2,
+    borderColor: '#2196f3',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  extractButtonIcon: {
+    fontSize: 32,
+    marginRight: 15,
+  },
+  extractButtonContent: {
+    flex: 1,
+  },
+  extractButtonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1976d2',
+    marginBottom: 4,
+  },
+  extractButtonSubtitle: {
+    fontSize: 13,
+    color: '#1565c0',
   },
   input: {
     backgroundColor: 'white',
@@ -105,6 +164,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 15,
     fontSize: 16,
+    color: '#333',
   },
   multilineInput: {
     height: 100,
