@@ -298,7 +298,7 @@ This project uses quality open-source libraries. See package.json for complete l
 
 ### Report Issues
 Found a bug? Please report it:
-- Email: feedback@cookingapp.com
+- Email: support@myrecipeapp.com (replace with your monitored support email)
 - GitHub Issues: https://github.com/nmohamaya/Cooking_app/issues
 - In-App Feedback: Use the feedback system in settings
 
@@ -310,7 +310,7 @@ Have a great idea? We'd love to hear it:
 ### Privacy & Security
 Questions about privacy?
 - Read Privacy Policy: docs/PRIVACY_POLICY.md
-- Email security concerns: security@cookingapp.com
+- Email security concerns: security@myrecipeapp.com (replace with your monitored security email)
 
 ---
 
@@ -388,7 +388,7 @@ Questions about privacy?
 
 Thank you for downloading MyRecipeApp! We hope it helps make your cooking experience better.
 
-For questions, feedback, or suggestions, please use the in-app feedback system or contact us at feedback@cookingapp.com.
+For questions, feedback, or suggestions, please use the in-app feedback system or contact us at support@myrecipeapp.com.
 
 **Happy cooking! 👨‍🍳👩‍🍳**
 
@@ -396,5 +396,5 @@ For questions, feedback, or suggestions, please use the in-app feedback system o
 
 **Version:** 1.0.0  
 **Release Date:** December 21, 2025  
-**Status:** Available on Google Play Store  
-**Download:** https://play.google.com/store/apps/details?id=com.cookingapp.myrecipeapp
+**Status:** Google Play Store release planned (link will be updated once the app is live)  
+**Download (placeholder - update after publication):** https://play.google.com/store/apps/details?id=com.cookingapp.myrecipeapp

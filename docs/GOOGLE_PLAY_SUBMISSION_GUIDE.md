@@ -63,7 +63,7 @@ In **App content** → **Store listing**:
    ```
    AI-powered recipe extraction, multi-timer, and smart cooking companion
    ```
-4. Characters used: 78/80 ✓
+4. Characters used: 75/80 ✓
 5. Click **Save**
 
 #### 4.2 Full Description (Max 4000 characters)
@@ -142,7 +142,7 @@ In **App content** → **App content**:
 
 1. Find **Developer contact information**
 2. Enter:
-   - **Email:** your-email@example.com
+   - **Email:** support@myrecipeapp.com (replace with your monitored support email)
    - **Website:** https://github.com/nmohamaya/Cooking_app
    - **Phone:** (optional)
 3. Click **Save**
@@ -433,4 +433,4 @@ Before each step, verify:
 **Last Updated:** 2025-12-21  
 **Version:** 1.0.0  
 **Status:** Ready for submission ✅  
-**Support:** contact@cookingapp.com
+**Support:** support@myrecipeapp.com (replace with your monitored support email)

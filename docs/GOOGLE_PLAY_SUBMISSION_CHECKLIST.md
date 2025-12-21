@@ -139,7 +139,7 @@
 - [ ] Select type: "App"
 
 ### Enter Store Listing
-- [ ] **Title**: "MyRecipeApp - Smart Recipe Extraction & Cooking Assistant"
+- [ ] **Title**: "MyRecipeApp" (max 50 chars - use simplified title to stay within limit)
 - [ ] **Short description**: From `store_listing/short_description.txt`
 - [ ] **Full description**: From `store_listing/full_description.txt`
 - [ ] **Category**: Food & Drink
