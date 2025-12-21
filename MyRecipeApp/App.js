@@ -2037,7 +2037,7 @@ export default function App() {
           onCreateCustom={() => setShowCreateTimer(true)}
           recipeTitle={timerForRecipe?.title}
         />
-      </ScrollView>
+      </View>
     );
   }
 
