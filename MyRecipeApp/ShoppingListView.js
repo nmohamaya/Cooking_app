@@ -8,10 +8,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { mealPlanningService } from './mealPlanningService';
-import {
-  shoppingListService,
-  INGREDIENT_CATEGORIES,
-} from './shoppingListService';
+import shoppingListService, { INGREDIENT_CATEGORIES } from './shoppingListService';
 
 /**
  * ShoppingListView Component
@@ -24,7 +21,7 @@ import {
  * - Clear purchased items
  * - Scroll through categories
  */
-export const ShoppingListView = ({ onBack }) => {
+export const ShoppingListView = ({ onBack, recipes = [], onSaveShoppingList = null }) => {
   const [filterMode, setFilterMode] = useState('week'); // 'week', 'day', 'custom'
   const [selectedDay, setSelectedDay] = useState(0); // 0 = Monday
   const [selectedDays, setSelectedDays] = useState([]);
@@ -46,20 +43,25 @@ export const ShoppingListView = ({ onBack }) => {
       setMealPlan(parsedMealPlan);
 
       // Generate list based on filter mode
+      // Pass recipes array so the service can look up real recipes
       let generatedList = {};
       if (filterMode === 'week') {
         generatedList = shoppingListService.generateWeeklyShoppingList(
-          parsedMealPlan
+          parsedMealPlan,
+          0,
+          recipes
         );
       } else if (filterMode === 'day') {
         generatedList = shoppingListService.generateDailyShoppingList(
           selectedDay,
-          parsedMealPlan
+          parsedMealPlan,
+          recipes
         );
       } else if (filterMode === 'custom' && selectedDays.length > 0) {
         generatedList = shoppingListService.generateCustomShoppingList(
           selectedDays,
-          parsedMealPlan
+          parsedMealPlan,
+          recipes
         );
       }
 
@@ -69,12 +71,16 @@ export const ShoppingListView = ({ onBack }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [filterMode, selectedDay, selectedDays]);
+  }, [filterMode, selectedDay, selectedDays, recipes]);
 
   // Load list on component mount and when filters change
   React.useEffect(() => {
     loadAndGenerateList();
   }, [loadAndGenerateList]);
+
+  const clearAllShoppingList = () => {
+    setShoppingList({});
+  };
 
   // Toggle purchase status for an item
   const togglePurchaseStatus = (category, ingredientIndex) => {
@@ -91,9 +97,10 @@ export const ShoppingListView = ({ onBack }) => {
   const clearPurchased = () => {
     const updatedList = {};
     Object.keys(shoppingList).forEach((category) => {
-      updatedList[category] = shoppingListService.clearPurchasedItems(
-        shoppingList[category]
-      );
+      const unpurchased = shoppingList[category].filter((item) => !item.purchased);
+      if (unpurchased.length > 0) {
+        updatedList[category] = unpurchased;
+      }
     });
     setShoppingList(updatedList);
   };
@@ -165,15 +172,40 @@ export const ShoppingListView = ({ onBack }) => {
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
         <TouchableOpacity
-          style={styles.clearButton}
+          style={[styles.actionButton, styles.refreshButton]}
+          onPress={loadAndGenerateList}
+        >
+          <Text style={styles.actionButtonText}>↻ Refresh</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.clearButton]}
           onPress={clearPurchased}
           disabled={purchased === 0}
         >
-          <Text style={styles.clearButtonText}>
+          <Text style={styles.actionButtonText}>
             Clear Purchased ({purchased})
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.clearAllButton]}
+          onPress={clearAllShoppingList}
+          disabled={total === 0}
+        >
+          <Text style={styles.actionButtonText}>Clear All</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Save Shopping List Button (if callback provided) */}
+      {onSaveShoppingList && total > 0 && (
+        <View style={styles.saveButtonContainer}>
+          <TouchableOpacity
+            style={styles.saveButton}
+            onPress={() => onSaveShoppingList(shoppingList)}
+          >
+            <Text style={styles.saveButtonText}>✓ Save Shopping List</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Shopping List Content */}
       {isLoading ? (
@@ -513,17 +545,43 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  clearButton: {
+  actionButton: {
     flex: 1,
-    backgroundColor: '#FF3B30',
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
   },
-  clearButtonText: {
+  refreshButton: {
+    backgroundColor: '#007AFF',
+  },
+  clearButton: {
+    backgroundColor: '#FF9500',
+  },
+  clearAllButton: {
+    backgroundColor: '#FF3B30',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  saveButtonContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  saveButton: {
+    backgroundColor: '#34C759',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButtonText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   listContainer: {
     flex: 1,
