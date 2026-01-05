@@ -59,6 +59,8 @@ const INGREDIENT_CATEGORIES = {
   'salmon': 'Meat & Seafood',
   'tuna': 'Meat & Seafood',
   'shrimp': 'Meat & Seafood',
+  'prawns': 'Meat & Seafood',
+  'prosciutto': 'Meat & Seafood',
   'bacon': 'Meat & Seafood',
   'ham': 'Meat & Seafood',
   'turkey': 'Meat & Seafood',
@@ -324,26 +326,64 @@ export const categorizeIngredients = (ingredients) => {
  * Generate shopping list for entire week
  * 
  * @param {Array} mealPlan - Meal plan array from AsyncStorage
+ * @param {number} weekOffset - Week offset (0 = current week)
  * @returns {Object} Weekly shopping list organized by category
  */
-export const generateWeeklyShoppingList = (mealPlan) => {
+export const generateWeeklyShoppingList = (mealPlan, weekOffset = 0, recipes = []) => {
   if (!mealPlan || mealPlan.length === 0) {
     return {};
   }
 
   const allIngredients = [];
+  const uniqueRecipes = new Set();
 
-  // Extract unique recipes
-  const uniqueRecipes = new Set(mealPlan.map((meal) => meal.recipeId));
+  // Calculate the week start date for filtering
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay() + (weekOffset * 7));
+  weekStart.setHours(0, 0, 0, 0);
 
-  // Extract ingredients from all recipes
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
+
+  // Extract unique recipes - handle both old format (no assignedDate) and new format (with assignedDate)
+  mealPlan.forEach((meal) => {
+    // If assignedDate is present, filter by week date range
+    // If no assignedDate (legacy format), include all recipes
+    if (meal.assignedDate) {
+      const mealDate = new Date(meal.assignedDate);
+      if (mealDate >= weekStart && mealDate <= weekEnd) {
+        uniqueRecipes.add(meal.recipeId);
+      }
+    } else {
+      // Legacy format - include all
+      uniqueRecipes.add(meal.recipeId);
+    }
+  });
+
+  // Create a map for quick recipe lookup
+  const recipeMap = {};
+  recipes.forEach(recipe => {
+    recipeMap[recipe.id] = recipe;
+  });
+
+  // Extract ingredients from all recipes in this week
   uniqueRecipes.forEach((recipeId) => {
-    const recipe = getMockRecipe(recipeId);
-    const ingredients = extractRecipeIngredients(recipe);
-    allIngredients.push(...ingredients);
+    // First try to find the recipe in the provided recipes array
+    let recipe = recipeMap[recipeId];
+    // Fall back to mock recipe if not found
+    if (!recipe) {
+      recipe = getMockRecipe(recipeId);
+    }
+    if (recipe) {
+      const ingredients = extractRecipeIngredients(recipe);
+      allIngredients.push(...ingredients);
+    }
   });
 
   // Aggregate and categorize
+  if (allIngredients.length === 0) return {};
   const aggregated = aggregateIngredients(allIngredients);
   return categorizeIngredients(aggregated);
 };
@@ -353,21 +393,42 @@ export const generateWeeklyShoppingList = (mealPlan) => {
  * 
  * @param {number} dayOfWeek - Day index (0-6)
  * @param {Array} mealPlan - Meal plan array
+ * @param {Array} recipes - Array of real recipe objects with ingredients
  * @returns {Object} Daily shopping list organized by category
  */
-export const generateDailyShoppingList = (dayOfWeek, mealPlan) => {
+export const generateDailyShoppingList = (dayOfWeek, mealPlan, recipes = []) => {
   if (!mealPlan || !Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
     return {};
   }
 
   const allIngredients = [];
-  const recipesForDay = getRecipesForDay(dayOfWeek, mealPlan);
+  
+  // Get all recipes for this specific day from mealPlan
+  const uniqueRecipes = new Set();
+  mealPlan.forEach((meal) => {
+    if (meal.dayOfWeek === dayOfWeek) {
+      uniqueRecipes.add(meal.recipeId);
+    }
+  });
+
+  // Create a map for quick recipe lookup
+  const recipeMap = {};
+  recipes.forEach(recipe => {
+    recipeMap[recipe.id] = recipe;
+  });
 
   // Extract ingredients from day's recipes
-  recipesForDay.forEach((recipeId) => {
-    const recipe = getMockRecipe(recipeId);
-    const ingredients = extractRecipeIngredients(recipe);
-    allIngredients.push(...ingredients);
+  uniqueRecipes.forEach((recipeId) => {
+    // First try to find the recipe in the provided recipes array
+    let recipe = recipeMap[recipeId];
+    // Fall back to mock recipe if not found
+    if (!recipe) {
+      recipe = getMockRecipe(recipeId);
+    }
+    if (recipe) {
+      const ingredients = extractRecipeIngredients(recipe);
+      allIngredients.push(...ingredients);
+    }
   });
 
   // Aggregate and categorize
@@ -383,22 +444,50 @@ export const generateDailyShoppingList = (dayOfWeek, mealPlan) => {
  * @param {Array} mealPlan - Meal plan array
  * @returns {Object} Shopping list for selected days
  */
-export const generateCustomShoppingList = (dayIndices, mealPlan) => {
+/**
+ * Generate shopping list for a specific day range
+ * 
+ * @param {Array<number>} dayIndices - Array of day indices (0-6)
+ * @param {Array} mealPlan - Meal plan array
+ * @param {Array} recipes - Array of real recipe objects with ingredients
+ * @returns {Object} Shopping list for selected days
+ */
+export const generateCustomShoppingList = (dayIndices, mealPlan, recipes = []) => {
   if (!dayIndices || !Array.isArray(dayIndices) || dayIndices.length === 0) {
     return {};
   }
 
   const allIngredients = [];
+  const uniqueRecipes = new Set();
 
   // Extract ingredients from selected days
   dayIndices.forEach((dayOfWeek) => {
     if (Number.isInteger(dayOfWeek) && dayOfWeek >= 0 && dayOfWeek <= 6) {
-      const recipesForDay = getRecipesForDay(dayOfWeek, mealPlan);
-      recipesForDay.forEach((recipeId) => {
-        const recipe = getMockRecipe(recipeId);
-        const ingredients = extractRecipeIngredients(recipe);
-        allIngredients.push(...ingredients);
+      mealPlan.forEach((meal) => {
+        if (meal.dayOfWeek === dayOfWeek) {
+          uniqueRecipes.add(meal.recipeId);
+        }
       });
+    }
+  });
+
+  // Create a map for quick recipe lookup
+  const recipeMap = {};
+  recipes.forEach(recipe => {
+    recipeMap[recipe.id] = recipe;
+  });
+
+  // Extract ingredients from recipes
+  uniqueRecipes.forEach((recipeId) => {
+    // First try to find the recipe in the provided recipes array
+    let recipe = recipeMap[recipeId];
+    // Fall back to mock recipe if not found
+    if (!recipe) {
+      recipe = getMockRecipe(recipeId);
+    }
+    if (recipe) {
+      const ingredients = extractRecipeIngredients(recipe);
+      allIngredients.push(...ingredients);
     }
   });
 

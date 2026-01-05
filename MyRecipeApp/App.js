@@ -74,6 +74,11 @@ export default function App() {
   const [newTimerForm, setNewTimerForm] = useState({ hours: 0, minutes: 5, seconds: 0, label: '' });
   const [timerForRecipe, setTimerForRecipe] = useState(null); // Recipe context for timer creation
   const timerIntervalRef = useRef(null);
+
+  // Meal Plan state
+  const [showMealRecipePicker, setShowMealRecipePicker] = useState(false);
+  const [selectedMealSlot, setSelectedMealSlot] = useState(null); // { dayOfWeek, mealType }
+  const [mealPlanRefresh, setMealPlanRefresh] = useState(0); // Trigger to refresh meal plan view
   
   const [form, setForm] = useState({ 
     title: '', 
@@ -1445,23 +1450,147 @@ export default function App() {
     }
   };
 
+  // Meal Plan: Add recipe to meal slot
+  const handleAddRecipeToMealSlot = async (recipe) => {
+    if (!selectedMealSlot) {
+      console.warn('No meal slot selected');
+      return;
+    }
+
+    try {
+      console.log('Adding recipe to meal slot:', recipe.title, selectedMealSlot);
+      // Load current meal plan
+      let mealPlan = await AsyncStorage.getItem('@myrecipeapp/meal_plan');
+      console.log('Current meal plan from AsyncStorage:', mealPlan);
+      const plan = mealPlan ? JSON.parse(mealPlan) : [];
+      console.log('Parsed meal plan:', plan);
+
+      // Create new meal assignment
+      const newMeal = {
+        id: `${recipe.id}-${selectedMealSlot.dayOfWeek}-${selectedMealSlot.mealType}-${Date.now()}`,
+        recipeId: recipe.id,
+        dayOfWeek: selectedMealSlot.dayOfWeek,
+        mealType: selectedMealSlot.mealType,
+        assignedDate: new Date().toISOString(),
+      };
+
+      console.log('New meal object:', newMeal);
+
+      // Add to both keys for compatibility
+      const updatedPlan = [...plan, newMeal];
+      console.log('Updated plan:', updatedPlan);
+      
+      await AsyncStorage.setItem('@myrecipeapp/meal_plan', JSON.stringify(updatedPlan));
+      console.log('Saved to @myrecipeapp/meal_plan');
+      
+      await AsyncStorage.setItem('mealPlan', JSON.stringify(updatedPlan));
+      console.log('Saved to mealPlan key');
+
+      // Close modal and reset state
+      setShowMealRecipePicker(false);
+      setSelectedMealSlot(null);
+      // Trigger refresh of meal plan view
+      setMealPlanRefresh(prev => prev + 1);
+      console.log('Triggered meal plan refresh');
+
+      Alert.alert('Success', `Added ${recipe.title} to your meal plan!`);
+    } catch (error) {
+      console.error('Error adding recipe to meal plan:', error);
+      Alert.alert('Error', 'Failed to add recipe to meal plan. Check console for details.');
+    }
+  };
+
+  const handleMealSlotPress = (dayOfWeek, mealType) => {
+    console.log('Meal slot pressed:', dayOfWeek, mealType);
+    console.log('Current recipes count:', recipes?.length || 0);
+    console.log('Recipes:', recipes);
+    setSelectedMealSlot({ dayOfWeek, mealType });
+    setShowMealRecipePicker(true);
+  };
+
   // Meal Plan screen (Weekly planner)
   if (screen === 'mealPlan') {
     return (
-      <View style={styles.container}>
-        <View style={[styles.headerButtons, { paddingHorizontal: 16, paddingTop: 12 }]}>
-          <TouchableOpacity
-            style={[styles.smallButton, { backgroundColor: '#f0f0f0' }]}
-            onPress={() => setScreen('home')}
-          >
-            <Text style={[styles.smallButtonText, { color: '#333' }]}>← Back</Text>
-          </TouchableOpacity>
+      <>
+        <View style={styles.container}>
+          <View style={[styles.headerButtons, { paddingHorizontal: 16, paddingTop: 12 }]}>
+            <TouchableOpacity
+              style={[styles.smallButton, { backgroundColor: '#f0f0f0' }]}
+              onPress={() => setScreen('home')}
+            >
+              <Text style={[styles.smallButtonText, { color: '#333' }]}>← Back</Text>
+            </TouchableOpacity>
+          </View>
+
+          <WeeklyMealPlanView
+            recipes={recipes}
+            onMealSlotPress={handleMealSlotPress}
+            onGenerateShoppingList={() => setScreen('shoppingGenerator')}
+            refreshTrigger={mealPlanRefresh}
+          />
         </View>
 
-        <WeeklyMealPlanView
-          onGenerateShoppingList={() => setScreen('shoppingGenerator')}
-        />
-      </View>
+        {/* Recipe Picker Modal */}
+        <Modal
+          transparent={true}
+          visible={showMealRecipePicker === true}
+          onRequestClose={() => {
+            console.log('Modal close requested');
+            setShowMealRecipePicker(false);
+            setSelectedMealSlot(null);
+          }}
+          animationType="fade"
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: '90%', maxHeight: 500 }]}>
+              <View style={{ paddingBottom: 12 }}>
+                <Text style={styles.modalTitle}>Select Recipe</Text>
+                <Text style={styles.modalSubtitle}>
+                  {selectedMealSlot && selectedMealSlot.mealType 
+                    ? selectedMealSlot.mealType.charAt(0).toUpperCase() + selectedMealSlot.mealType.slice(1)
+                    : 'Recipe'}
+                </Text>
+              </View>
+
+              {!recipes || recipes.length === 0 ? (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 16, color: '#999' }}>No recipes available</Text>
+                </View>
+              ) : (
+                <ScrollView style={{ height: 300 }}>
+                  {recipes.map((recipe) => (
+                    <View key={recipe.id || Math.random()}>
+                      <TouchableOpacity
+                        style={{ paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' }}
+                        onPress={() => {
+                          console.log('Selected recipe:', recipe.title);
+                          handleAddRecipeToMealSlot(recipe);
+                        }}
+                      >
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 4 }}>{recipe.title || 'Untitled'}</Text>
+                        <Text style={{ fontSize: 13, color: '#999' }}>{recipe.category || 'N/A'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+
+              <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0' }}>
+                <TouchableOpacity
+                  style={{ paddingVertical: 12, paddingHorizontal: 12, backgroundColor: '#666', borderRadius: 6, alignItems: 'center' }}
+                  onPress={() => {
+                    console.log('Modal cancel');
+                    setShowMealRecipePicker(false);
+                    setSelectedMealSlot(null);
+                  }}
+                >
+                  <Text style={{ color: 'white', fontWeight: '600' }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </>
     );
   }
 
@@ -1469,7 +1598,7 @@ export default function App() {
   if (screen === 'shoppingGenerator') {
     return (
       <View style={styles.container}>
-        <ShoppingListView onBack={() => setScreen('mealPlan')} />
+        <ShoppingListView onBack={() => setScreen('mealPlan')} recipes={recipes} />
       </View>
     );
   }
@@ -3551,5 +3680,35 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginRight: 10,
+  },
+  // Recipe list item styles
+  recipeListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  recipeListItemContent: {
+    flex: 1,
+  },
+  recipeListItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  recipeListItemCategory: {
+    fontSize: 13,
+    color: '#999',
+    marginTop: 4,
+  },
+  recipeListItemArrow: {
+    fontSize: 18,
+    color: '#007AFF',
+    fontWeight: '300',
+    marginLeft: 12,
   },
 });

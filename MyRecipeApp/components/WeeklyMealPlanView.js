@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -38,26 +38,35 @@ try {
  * - Shows summary of planned meals for the week
  * 
  * Props:
+ * - recipes: array - List of all recipes for looking up recipe details
  * - onRecipePress: (recipeId) => void - Called when a recipe is tapped
  * - onMealSlotPress: (dayOfWeek, mealType) => void - Called when an empty meal slot is tapped
  * - onRecipeRemove: (recipeId, dayOfWeek, mealType) => void - Called to remove a recipe
+ * - refreshTrigger: number - Pass a changing value to force a reload of the meal plan
  * 
  * @component
  */
 export const WeeklyMealPlanView = ({
+  recipes = [],
   onRecipePress = () => {},
   onMealSlotPress = () => {},
   onRecipeRemove = () => {},
   onGenerateShoppingList = () => {},
+  refreshTrigger = 0,
 }) => {
   const [mealPlan, setMealPlan] = useState([]);
   const [weekOffset, setWeekOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [weekPlanData, setWeekPlanData] = useState({});
 
+  // Ensure recipes is always an array
+  const recipeList = useMemo(() => {
+    return Array.isArray(recipes) ? recipes : [];
+  }, [recipes]);
+
   useEffect(() => {
     loadMealPlan();
-  }, [weekOffset]);
+  }, [weekOffset, refreshTrigger]);
 
   const loadMealPlan = async () => {
     try {
@@ -72,12 +81,28 @@ export const WeeklyMealPlanView = ({
       setMealPlan(plan);
 
       // Generate week plan data
-      const weekData = getWeeklyMealPlan(plan);
+      const weekData = getWeeklyMealPlan(plan, weekOffset);
       setWeekPlanData(weekData);
     } catch (error) {
       console.error('Error loading meal plan:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const clearMealPlan = async () => {
+    // Ask user to confirm
+    if (window.confirm && !window.confirm('Are you sure you want to clear all recipes from the meal plan?')) {
+      return;
+    }
+    try {
+      // Clear the meal plan
+      await AsyncStorage.setItem('@myrecipeapp/meal_plan', JSON.stringify([]));
+      await AsyncStorage.setItem('mealPlan', JSON.stringify([]));
+      setMealPlan([]);
+      setWeekPlanData({});
+    } catch (error) {
+      console.error('Error clearing meal plan:', error);
     }
   };
 
@@ -88,8 +113,7 @@ export const WeeklyMealPlanView = ({
       await AsyncStorage.setItem('@myrecipeapp/meal_plan', serialized);
       await AsyncStorage.setItem('mealPlan', serialized);
       setMealPlan(newPlan);
-      
-      const weekData = getWeeklyMealPlan(newPlan);
+      const weekData = getWeeklyMealPlan(newPlan, weekOffset);
       setWeekPlanData(weekData);
     } catch (error) {
       console.error('Error saving meal plan:', error);
@@ -110,17 +134,47 @@ export const WeeklyMealPlanView = ({
   };
 
   const getTotalRecipes = () => {
-    const uniqueRecipes = new Set(mealPlan.map((item) => item.recipeId));
+    // Count unique recipes in the current week's data
+    const allRecipes = Object.values(weekPlanData).reduce((acc, dayData) => {
+      if (dayData && typeof dayData === 'object') {
+        Object.values(dayData).forEach(mealRecipes => {
+          if (Array.isArray(mealRecipes)) {
+            acc.push(...mealRecipes);
+          }
+        });
+      }
+      return acc;
+    }, []);
+    const uniqueRecipes = new Set(allRecipes);
     return uniqueRecipes.size;
   };
 
+  const getRecipeTitle = (recipeId) => {
+    if (!recipeList || recipeList.length === 0) {
+      return recipeId;
+    }
+    const recipe = recipeList.find((r) => r && r.id === recipeId);
+    return recipe && recipe.title ? recipe.title : recipeId;
+  };
+
   const getWeekSummary = () => {
-    const totalMeals = mealPlan.length;
+    // Count meals in the current week's data
+    let totalMeals = 0;
+    Object.values(weekPlanData).forEach(dayData => {
+      if (dayData && typeof dayData === 'object') {
+        Object.values(dayData).forEach(mealRecipes => {
+          if (Array.isArray(mealRecipes)) {
+            totalMeals += mealRecipes.length;
+          }
+        });
+      }
+    });
     const uniqueRecipes = getTotalRecipes();
     return { totalMeals, uniqueRecipes };
   };
 
   if (loading) {
+    console.log('WeeklyMealPlanView: Loading...');
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#FF6B6B" />
@@ -129,6 +183,7 @@ export const WeeklyMealPlanView = ({
   }
 
   const { totalMeals, uniqueRecipes } = getWeekSummary();
+  console.log('WeeklyMealPlanView: Rendering week', weekOffset, 'with', totalMeals, 'meals');
 
   return (
     <View style={styles.container}>
@@ -167,7 +222,8 @@ export const WeeklyMealPlanView = ({
               dayName={DAYS_OF_WEEK[dayIndex]}
               mealData={weekPlanData[dayIndex] || {}}
               onRecipePress={onRecipePress}
-              onMealSlotPress={() => onMealSlotPress(dayIndex)}
+              getRecipeTitle={getRecipeTitle}
+              onMealSlotPress={onMealSlotPress}
               onRecipeRemove={handleRecipeRemove}
             />
           ))}
@@ -184,7 +240,7 @@ export const WeeklyMealPlanView = ({
         )}
       </ScrollView>
 
-        {/* Generate Shopping List CTA */}
+        {/* Generate Shopping List CTA and Clear Button */}
         <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.generateButton, totalMeals === 0 && styles.generateButtonDisabled]}
@@ -194,6 +250,13 @@ export const WeeklyMealPlanView = ({
             <Text style={styles.generateButtonText}>
               {totalMeals === 0 ? 'Add meals to generate a list' : 'Generate Shopping List'}
             </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.clearMealButton, totalMeals === 0 && styles.clearMealButtonDisabled]}
+            onPress={clearMealPlan}
+            disabled={totalMeals === 0}
+          >
+            <Text style={styles.clearMealButtonText}>Clear All Recipes</Text>
           </TouchableOpacity>
         </View>
     </View>
@@ -218,6 +281,7 @@ const DayCard = ({
   dayName,
   mealData,
   onRecipePress,
+  getRecipeTitle,
   onMealSlotPress,
   onRecipeRemove,
 }) => {
@@ -243,7 +307,8 @@ const DayCard = ({
               recipes={mealData[mealType] || []}
               dayOfWeek={dayOfWeek}
               onRecipePress={onRecipePress}
-              onAddRecipe={onMealSlotPress}
+              getRecipeTitle={getRecipeTitle}
+              onAddRecipe={() => onMealSlotPress(dayOfWeek, mealType)}
               onRemoveRecipe={(recipeId) =>
                 onRecipeRemove(recipeId, dayOfWeek, mealType)
               }
@@ -273,6 +338,7 @@ const MealSection = ({
   recipes,
   dayOfWeek,
   onRecipePress,
+  getRecipeTitle,
   onAddRecipe,
   onRemoveRecipe,
 }) => {
@@ -303,6 +369,7 @@ const MealSection = ({
             <RecipeItem
               key={`${recipeId}-${index}`}
               recipeId={recipeId}
+              recipeTitle={getRecipeTitle(recipeId)}
               mealColor={mealColors[mealType]}
               onPress={() => onRecipePress(recipeId)}
               onRemove={() => onRemoveRecipe(recipeId)}
@@ -332,14 +399,14 @@ const MealSection = ({
  * - onPress: () => void
  * - onRemove: () => void
  */
-const RecipeItem = ({ recipeId, mealColor, onPress, onRemove }) => {
+const RecipeItem = ({ recipeId, recipeTitle, mealColor, onPress, onRemove }) => {
   return (
     <View style={styles.recipeItem}>
       <TouchableOpacity
         style={[styles.recipeName, { borderLeftColor: mealColor }]}
         onPress={onPress}
       >
-        <Text style={styles.recipeText}>{recipeId}</Text>
+        <Text style={styles.recipeText}>{recipeTitle || recipeId}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -541,8 +608,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
     backgroundColor: '#fff',
+    flexDirection: 'row',
+    gap: 12,
   },
   generateButton: {
+    flex: 2,
     backgroundColor: '#FF6B6B',
     paddingVertical: 14,
     borderRadius: 10,
@@ -554,6 +624,21 @@ const styles = StyleSheet.create({
   generateButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '700',
+  },
+  clearMealButton: {
+    flex: 1,
+    backgroundColor: '#FF3B30',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  clearMealButtonDisabled: {
+    backgroundColor: '#f5a7a0',
+  },
+  clearMealButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '700',
   },
 });

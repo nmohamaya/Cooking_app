@@ -117,7 +117,7 @@ export const getRecipesByMealType = (mealType, mealPlan = []) => {
  * @param {Array} mealPlan - Meal plan array
  * @returns {Object} Full week meal plan organized by day and meal type
  */
-export const getWeeklyMealPlan = (mealPlan = []) => {
+export const getWeeklyMealPlan = (mealPlan = [], weekOffset = 0) => {
   const weekPlan = {};
 
   DAYS_OF_WEEK.forEach((day, dayIndex) => {
@@ -130,9 +130,23 @@ export const getWeeklyMealPlan = (mealPlan = []) => {
     };
   });
 
+  // Calculate the week start date
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay() + (weekOffset * 7));
+  weekStart.setHours(0, 0, 0, 0);
+
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
+
   mealPlan.forEach(meal => {
-    if (weekPlan[meal.dayOfWeek] && weekPlan[meal.dayOfWeek][meal.mealType]) {
-      weekPlan[meal.dayOfWeek][meal.mealType].push(meal.recipeId);
+    // Check if meal belongs to this week
+    const mealDate = new Date(meal.assignedDate);
+    if (mealDate >= weekStart && mealDate <= weekEnd) {
+      if (weekPlan[meal.dayOfWeek] && weekPlan[meal.dayOfWeek][meal.mealType]) {
+        weekPlan[meal.dayOfWeek][meal.mealType].push(meal.recipeId);
+      }
     }
   });
 
