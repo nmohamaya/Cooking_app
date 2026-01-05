@@ -21,7 +21,7 @@ import shoppingListService, { INGREDIENT_CATEGORIES } from './shoppingListServic
  * - Clear purchased items
  * - Scroll through categories
  */
-export const ShoppingListView = ({ onBack, recipes = [] }) => {
+export const ShoppingListView = ({ onBack, recipes = [], onSaveShoppingList = null }) => {
   const [filterMode, setFilterMode] = useState('week'); // 'week', 'day', 'custom'
   const [selectedDay, setSelectedDay] = useState(0); // 0 = Monday
   const [selectedDays, setSelectedDays] = useState([]);
@@ -194,6 +194,18 @@ export const ShoppingListView = ({ onBack, recipes = [] }) => {
           <Text style={styles.actionButtonText}>Clear All</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Save Shopping List Button (if callback provided) */}
+      {onSaveShoppingList && total > 0 && (
+        <View style={styles.saveButtonContainer}>
+          <TouchableOpacity
+            style={styles.saveButton}
+            onPress={() => onSaveShoppingList(shoppingList)}
+          >
+            <Text style={styles.saveButtonText}>✓ Save Shopping List</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Shopping List Content */}
       {isLoading ? (
@@ -552,6 +564,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',
+  },
+  saveButtonContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  saveButton: {
+    backgroundColor: '#34C759',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   listContainer: {
     flex: 1,

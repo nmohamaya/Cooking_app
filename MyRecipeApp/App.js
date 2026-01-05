@@ -1598,7 +1598,28 @@ export default function App() {
   if (screen === 'shoppingGenerator') {
     return (
       <View style={styles.container}>
-        <ShoppingListView onBack={() => setScreen('mealPlan')} recipes={recipes} />
+        <ShoppingListView 
+          onBack={() => setScreen('mealPlan')} 
+          recipes={recipes}
+          onSaveShoppingList={(generatedList) => {
+            // Convert the categorized shopping list to the app's format
+            const items = [];
+            Object.values(generatedList).forEach((itemsInCategory) => {
+              itemsInCategory.forEach((item) => {
+                items.push({
+                  id: `${item.name}-${Date.now()}-${Math.random()}`,
+                  ingredient: item.name,
+                  quantity: item.quantity || 1,
+                  unit: item.unit || 'piece',
+                  checked: false,
+                  recipeIds: item.recipes || [],
+                });
+              });
+            });
+            setShoppingList(items);
+            setScreen('shopping');
+          }}
+        />
       </View>
     );
   }
