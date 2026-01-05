@@ -2,38 +2,69 @@
 
 ## Development Workflow
 
-**📋 See [MyRecipeApp/README.md](MyRecipeApp/README.md#project-workflow) for the complete development workflow.**
+**📋 See [README.md](./README.md#development-workflow) for the complete development workflow.**
 
-This includes:
+The workflow includes:
 - Issue creation and project board management
-- Branch naming conventions
-- Commit message standards
-- PR requirements and review process
-- Post-merge cleanup
+- Branch naming conventions (feature/issue-XX, fix/issue-XX, docs/issue-XX)
+- Commit message standards with issue references
+- 9-step PR process with critical verification step
+- Post-merge cleanup procedures
+- Best practices and common issues/solutions
 
-## Quick Reference
+## Quick Reference Checklist
 
-### Before Starting Work
-1. Create an issue (required before any code changes)
-2. Set issue status to "In Progress" in GitHub Project
-3. Create feature branch from `main`: `git checkout -b feature/issue-N-description`
+### ✅ Before Starting Work
+- [ ] Create an issue (required before any code changes)
+- [ ] Set issue status to "In Progress" in GitHub Project
+- [ ] Create feature branch: `git checkout -b feature/issue-N-description`
 
-### During Development
-- Write tests for new functionality
-- Run tests locally: `npm test`
-- Run security audit: `npm run security`
-- Make atomic commits with issue reference
+### ✅ During Development
+- [ ] Write tests for new functionality (target: 90%+ coverage)
+- [ ] Run tests locally: `npm test`
+- [ ] Run security audit: `npm run security`
+- [ ] Make atomic commits with issue reference: `fix(#N): description`
 
-### Creating PR
-1. Push branch and create PR with "Closes #N" in title/body
-2. Set issue status to "In Review"
-3. Complete manual testing checklist
-4. Wait for CI/CD checks to pass
+### ✅ Before Creating PR
+- [ ] All tests pass locally (532/532)
+- [ ] Security audit passes (0 vulnerabilities)
+- [ ] Code is self-reviewed
+- [ ] Commit messages reference issue number
 
-### After Merge
-1. Switch to main: `git checkout main`
-2. Pull changes: `git pull origin main`
-3. Delete local branch: `git branch -d feature/issue-N-description`
+### ✅ Creating PR
+- [ ] Push branch: `git push origin feature/issue-N-description`
+- [ ] Create PR with: `Closes #N` in description
+- [ ] Set issue status to "In Review"
+- [ ] Request human reviewers
+
+### ⚠️ CRITICAL - Verify PR Functionality (Step 5)
+**This prevents shipping broken code. All PRs require:**
+- [ ] `npx expo install --check` passes (all dependencies aligned)
+- [ ] `npm test` passes (532/532 tests, 91.32%+ coverage)
+- [ ] `npm run security` passes (0 vulnerabilities)
+- [ ] Platform builds succeed (EAS build or web build)
+- [ ] Build logs reviewed for warnings/errors
+- [ ] No missing peer dependencies
+
+See [README.md#why-pre-merge-verification-matters](./README.md#why-pre-merge-verification-matters) for why this step is critical.
+
+### ✅ After Review
+- [ ] Address all reviewer feedback
+- [ ] Request re-review when ready
+- [ ] All CI/CD checks pass
+
+### ✅ Manual QA Testing
+- [ ] Test on Android device/emulator
+- [ ] Test on iOS simulator (if applicable)
+- [ ] Test on web browser
+- [ ] Verify all user workflows work
+- [ ] Document any issues found
+
+### ✅ After Merge
+- [ ] Switch to main: `git checkout main`
+- [ ] Pull changes: `git pull origin main`
+- [ ] Delete local branch: `git branch -d feature/issue-N-description`
+- [ ] Delete remote branch: `git push origin :feature/issue-N-description`
 
 ## Code Standards
 
