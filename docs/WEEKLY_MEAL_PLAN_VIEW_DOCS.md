@@ -11,6 +11,7 @@ The **Weekly Meal Plan View** is a comprehensive React Native component that dis
 ✅ **Color-Coded Meals** - Visually distinct colors for each meal type
 ✅ **Week Navigation** - Browse current and future weeks
 ✅ **Quick Actions** - Add/remove recipes with single tap
+✅ **Shopping List CTA** - One-tap entry to generate a shopping list from the current plan
 ✅ **Today Indicator** - Highlights current day for quick reference
 ✅ **Week Summary** - Shows total unique recipes and meals
 ✅ **Empty States** - Clear indication when no meals are planned
@@ -49,7 +50,8 @@ Main component that manages the entire meal plan view.
 {
   onRecipePress: (recipeId: string) => void,       // Called when recipe is tapped
   onMealSlotPress: (dayOfWeek: number, mealType: string) => void,  // Empty slot tap
-  onRecipeRemove: (recipeId: string, dayOfWeek: number, mealType: string) => void  // Remove
+  onRecipeRemove: (recipeId: string, dayOfWeek: number, mealType: string) => void, // Remove
+  onGenerateShoppingList: () => void,             // Launch shopping list flow for the current plan
 }
 ```
 
@@ -69,6 +71,10 @@ Main component that manages the entire meal plan view.
 - `handleRecipeRemove(recipeId, dayOfWeek, mealType)` - Removes recipe and saves
 - `getTotalRecipes()` - Counts unique recipes
 - `getWeekSummary()` - Returns summary statistics
+
+**Footer CTA:**
+- Renders a bottom-aligned "Generate Shopping List" button.
+- Disabled when no meals are planned; calls `onGenerateShoppingList` when tapped.
 
 **Example Usage:**
 ```javascript
@@ -92,6 +98,7 @@ function MealPlanScreen() {
       onRecipePress={handleRecipePress}
       onMealSlotPress={handleMealSlotPress}
       onRecipeRemove={handleRecipeRemove}
+      onGenerateShoppingList={() => navigation.navigate('ShoppingList')}
     />
   );
 }
@@ -197,7 +204,7 @@ The component uses React Native's `StyleSheet` for optimized performance.
 ```
 ┌─────────────────────────────────────────┐
 │   AsyncStorage (Persistent Storage)     │
-│   Key: '@myrecipeapp/meal_plan'        │
+│   Keys: '@myrecipeapp/meal_plan' + 'mealPlan' │
 └──────────────┬──────────────────────────┘
                │
                ↓
@@ -231,7 +238,9 @@ The component uses React Native's `StyleSheet` for optimized performance.
 
 Meal plans are persisted in AsyncStorage as JSON:
 
-**Key:** `@myrecipeapp/meal_plan`
+**Keys:**
+- `@myrecipeapp/meal_plan` (namespaced, preferred)
+- `mealPlan` (legacy; still written for backward compatibility)
 
 **Format:**
 ```javascript
