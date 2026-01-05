@@ -24,7 +24,7 @@ import {
  * - Clear purchased items
  * - Scroll through categories
  */
-export const ShoppingListView = () => {
+export const ShoppingListView = ({ onBack }) => {
   const [filterMode, setFilterMode] = useState('week'); // 'week', 'day', 'custom'
   const [selectedDay, setSelectedDay] = useState(0); // 0 = Monday
   const [selectedDays, setSelectedDays] = useState([]);
@@ -36,7 +36,12 @@ export const ShoppingListView = () => {
   const loadAndGenerateList = useCallback(async () => {
     try {
       setIsLoading(true);
-      const savedMealPlan = await AsyncStorage.getItem('mealPlan');
+      // Prefer the namespaced key but fall back to legacy key for compatibility
+      let savedMealPlan = await AsyncStorage.getItem('@myrecipeapp/meal_plan');
+      if (!savedMealPlan) {
+        savedMealPlan = await AsyncStorage.getItem('mealPlan');
+      }
+
       const parsedMealPlan = savedMealPlan ? JSON.parse(savedMealPlan) : [];
       setMealPlan(parsedMealPlan);
 
@@ -112,7 +117,14 @@ export const ShoppingListView = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Shopping List</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <Text style={styles.backButtonText}>← Back</Text>
+            </TouchableOpacity>
+          )}
+          <Text style={styles.title}>Shopping List</Text>
+        </View>
         <Text style={styles.subtitle}>
           {purchased}/{total} items purchased
         </Text>
@@ -402,6 +414,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 5,
+  },
+  backButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 6,
+  },
+  backButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
   },
   subtitle: {
     fontSize: 14,

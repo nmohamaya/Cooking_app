@@ -6,6 +6,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { extractRecipeFromText, inferCategoryFromContent } from './services/recipeExtraction';
+import WeeklyMealPlanView from './components/WeeklyMealPlanView';
+import ShoppingListView from './ShoppingListView';
 import { checkForDuplicate, formatDuplicateMessage } from './services/recipeComparison';
 import { Picker } from '@react-native-picker/picker';
 import * as timerService from './services/timerService';
@@ -1443,6 +1445,35 @@ export default function App() {
     }
   };
 
+  // Meal Plan screen (Weekly planner)
+  if (screen === 'mealPlan') {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.headerButtons, { paddingHorizontal: 16, paddingTop: 12 }]}>
+          <TouchableOpacity
+            style={[styles.smallButton, { backgroundColor: '#f0f0f0' }]}
+            onPress={() => setScreen('home')}
+          >
+            <Text style={[styles.smallButtonText, { color: '#333' }]}>← Back</Text>
+          </TouchableOpacity>
+        </View>
+
+        <WeeklyMealPlanView
+          onGenerateShoppingList={() => setScreen('shoppingGenerator')}
+        />
+      </View>
+    );
+  }
+
+  // Shopping List Generator screen (from meal plan)
+  if (screen === 'shoppingGenerator') {
+    return (
+      <View style={styles.container}>
+        <ShoppingListView onBack={() => setScreen('mealPlan')} />
+      </View>
+    );
+  }
+
   // Shopping List Screen
   if (screen === 'shopping') {
     const uncheckedItems = shoppingList.filter(item => !item.checked);
@@ -1596,6 +1627,13 @@ export default function App() {
       <View style={styles.container}>
         <Text style={styles.header}>My Recipes</Text>
         <View style={styles.headerButtons}>
+          <TouchableOpacity 
+            style={[styles.smallButton, { marginRight: 8, backgroundColor: '#FF6B6B' }]}
+            onPress={() => setScreen('mealPlan')}
+          >
+            <Text style={styles.smallButtonText}>📅 Meal Plan</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity 
             style={[styles.smallButton, { marginRight: 8, backgroundColor: '#4CAF50' }]}
             onPress={() => setScreen('shopping')}

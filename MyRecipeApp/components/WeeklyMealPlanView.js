@@ -48,6 +48,7 @@ export const WeeklyMealPlanView = ({
   onRecipePress = () => {},
   onMealSlotPress = () => {},
   onRecipeRemove = () => {},
+  onGenerateShoppingList = () => {},
 }) => {
   const [mealPlan, setMealPlan] = useState([]);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -61,7 +62,12 @@ export const WeeklyMealPlanView = ({
   const loadMealPlan = async () => {
     try {
       setLoading(true);
-      const savedPlan = await AsyncStorage.getItem('@myrecipeapp/meal_plan');
+      // Read from both keys for compatibility with ShoppingListView
+      let savedPlan = await AsyncStorage.getItem('@myrecipeapp/meal_plan');
+      if (!savedPlan) {
+        savedPlan = await AsyncStorage.getItem('mealPlan');
+      }
+
       const plan = savedPlan ? JSON.parse(savedPlan) : [];
       setMealPlan(plan);
 
@@ -77,7 +83,10 @@ export const WeeklyMealPlanView = ({
 
   const saveMealPlan = async (newPlan) => {
     try {
-      await AsyncStorage.setItem('@myrecipeapp/meal_plan', JSON.stringify(newPlan));
+      // Persist under both keys so ShoppingListView can read it
+      const serialized = JSON.stringify(newPlan);
+      await AsyncStorage.setItem('@myrecipeapp/meal_plan', serialized);
+      await AsyncStorage.setItem('mealPlan', serialized);
       setMealPlan(newPlan);
       
       const weekData = getWeeklyMealPlan(newPlan);
@@ -174,6 +183,19 @@ export const WeeklyMealPlanView = ({
           </View>
         )}
       </ScrollView>
+
+        {/* Generate Shopping List CTA */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.generateButton, totalMeals === 0 && styles.generateButtonDisabled]}
+            onPress={onGenerateShoppingList}
+            disabled={totalMeals === 0}
+          >
+            <Text style={styles.generateButtonText}>
+              {totalMeals === 0 ? 'Add meals to generate a list' : 'Generate Shopping List'}
+            </Text>
+          </TouchableOpacity>
+        </View>
     </View>
   );
 };
@@ -512,6 +534,27 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 14,
     color: '#999',
+  },
+  footer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    backgroundColor: '#fff',
+  },
+  generateButton: {
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  generateButtonDisabled: {
+    backgroundColor: '#f2a7a7',
+  },
+  generateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
 
