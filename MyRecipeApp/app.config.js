@@ -19,6 +19,8 @@ export default {
     android: {
       package: "com.cookingapp.myrecipeapp",
       versionCode: 1,
+      minSdkVersion: 23,
+      targetSdkVersion: 34,
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#ffffff',
