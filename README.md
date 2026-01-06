@@ -198,6 +198,183 @@ git push origin :feature/issue-XX-description  # Delete remote branch
 
 ---
 
+## 🎯 Multi-Phase Feature Development Workflow
+
+For large features broken into multiple phases (like Issue #20: Video Transcription), use this specialized workflow:
+
+### Phase Implementation Strategy
+
+**Overview**: Each phase is a separate sub-issue with its own PR, allowing incremental development and review.
+
+```
+Parent Issue (#20): Video Transcription Feature
+├─ Phase 1 (#110): Backend infrastructure
+│  ├─ Branch: feature/issue-20-video-transcription
+│  ├─ PR: #118
+│  └─ Status: ✅ Merged
+├─ Phase 2 (#111): Video download & audio extraction
+│  ├─ PR: #119
+│  └─ Status: 🔄 In Review
+├─ Phase 3 (#112): Transcription with AI integration
+│  ├─ PR: #120
+│  └─ Status: ⏳ Pending
+└─ Phase 4-8: Remaining phases...
+```
+
+### Review Comment Handling
+
+When code review comments are received, batch them by severity:
+
+**Priority 1: Critical Bugs** (same-day fix)
+- Logic errors, data loss risks, crashes
+- Security vulnerabilities
+- Memory leaks or resource exhaustion
+- Example: Job status not updated, file cleanup not executed
+
+**Priority 2: Memory/Performance** (1-2 hour fix)
+- Memory leaks (unbounded queues, job accumulation)
+- Race conditions in async code
+- Timeout handling issues
+- Example: 24-hour TTL cleanup, queue size limits
+
+**Priority 3: Code Quality** (within PR cycle)
+- Unused variables or properties
+- Inconsistent error messages
+- Redundant or dead code
+- Example: Remove unused bitrate properties, fix error message format
+
+**Priority 4: Tests & Documentation** (before merge)
+- Placeholder tests that need replacement
+- Missing comments on coverage thresholds
+- Example: Replace dummy tests with TODO comments
+
+### Implementation Steps
+
+1. **Create Sub-Issues for Each Phase**
+   ```markdown
+   Title: feat(#20): [Phase N] Feature description
+   Description:
+   - Detailed requirements
+   - Dependencies on previous phases
+   - Expected deliverables
+   - Success criteria
+   ```
+
+2. **Single Feature Branch for All Phases**
+   ```bash
+   # Create once at the start
+   git checkout -b feature/issue-20-video-transcription
+   
+   # Use for ALL phases - keeps related work together
+   # Create new PR for each phase, but same branch
+   ```
+
+3. **Implement & Test Phase Locally**
+   ```bash
+   npm test           # All tests pass
+   npm audit         # Zero vulnerabilities
+   git diff main     # Review changes
+   ```
+
+4. **Create PR for Phase**
+   - Title: `feat: [Phase N description] (Closes #XXX)`
+   - Reference parent issue (#20) in description
+   - List dependencies on previous phases
+   - Include testing approach
+
+5. **Handle Review Comments**
+   - Group by severity (Priority 1 → 4)
+   - Fix in single focused commit
+   - Re-run tests after fixes
+   - Push to same PR (same branch)
+   - Mark comments as resolved
+
+6. **Track Deferred Work**
+   - If leaving placeholder tests or TODOs for later phases:
+     - Create a GitHub issue describing what needs to be done
+     - Reference the parent issue (#20) and current phase (#XXX)
+     - Link the issue in code comments (`// TODO: See issue #YYY`)
+     - Add label `deferred`, `testing`, or `technical-debt` as appropriate
+   - This ensures deferred work isn't forgotten and visibility is maintained
+
+7. **Merge When All Checks Pass**
+   - All tests passing (100%)
+   - Security audit clean (0 vulnerabilities)
+   - All review comments resolved
+   - Squash commit with clear message
+
+### Example: Issue #20 Phase 2 Review
+
+**Scenario**: PR #119 received 17 code review comments
+
+**Solution Approach**:
+```
+Critical Bugs (5 items):
+├─ Job status never set to 'processing'
+├─ Video path not stored for cleanup
+├─ Missing path validation in cleanup
+├─ Timeout handlers registered twice
+└─ Error handler doesn't update job status
+   → Fix in single commit, test, push
+
+Memory Issues (6 items):
+├─ No TTL for old download jobs
+├─ Queue accumulates unbounded
+├─ No cleanup mechanism
+├─ Max size enforcement missing
+└─ In-memory warning missing
+   → Fix in same commit as critical bugs
+
+Code Quality (6 items):
+├─ Unused 'metadata' variable
+├─ Unused 'bitrate' properties
+├─ Irrelevant -q:a parameter
+├─ Inconsistent error messages
+├─ Placeholder tests
+└─ Coverage threshold comments
+   → Fix in same commit
+
+Result: All 17 issues fixed in 1 commit, re-tested, pushed
+```
+
+### PR Template for Phase Features
+
+```markdown
+## Phase N: [Feature Name] (Closes #XXX)
+
+### Overview
+Brief description of what this phase accomplishes.
+
+### Dependencies
+- [ ] Phase N-1 (#XXX) - Must be merged first
+- [ ] External service X - Required for testing
+- [ ] Frontend/Backend - Which parts affected
+
+### What's Included
+- ✅ Service Y with Z functionality
+- ✅ Routes for endpoints A, B, C
+- ✅ N passing tests covering [areas]
+- ✅ PHASE_N_NOTES.md documentation
+
+### Files Changed
+- `backend/services/serviceX.js` - Core logic (X lines)
+- `backend/routes/routeX.js` - API endpoints (Y lines)
+- `backend/tests/serviceX.test.js` - Tests (Z lines)
+
+### Testing
+- ✅ All tests passing (X/X)
+- ✅ Coverage threshold maintained (XX%)
+- ✅ Security audit: 0 vulnerabilities
+- ✅ Pre-commit checks: All passing
+
+### Review Notes
+- Addresses PR comments from Phase N-1
+- Known limitations: [X, Y, Z]
+- Future improvements: [A, B, C] (in Phase N+1)
+```
+
+---
+
 ## Commit Message Standards
 
 Use this format for all commits:

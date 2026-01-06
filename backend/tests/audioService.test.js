@@ -82,6 +82,6 @@ describe('Audio Service - Issue #111', () => {
   });
 
   // Cleanup and error code tests skipped pending implementation of proper error triggering
-  // TODO: Add tests that actually trigger errors in extractAudio and cleanup functions
+  // TODO: See issue #121 - Add tests that actually trigger errors in extractAudio and cleanup functions
 
 });

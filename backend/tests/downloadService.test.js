@@ -77,6 +77,6 @@ describe('Download Service - Issue #111', () => {
   });
 
   // Cleanup tests skipped pending implementation of proper file system mocking
-  // TODO: Add cleanup tests using jest mock file system or temp directory
+  // TODO: See issue #120 - Add cleanup tests using jest mock file system or temp directory
 
 });
