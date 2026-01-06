@@ -73,6 +73,7 @@ const downloadVideo = async (url, outputDir = env.uploadDir) => {
 
       let stderr = '';
       let stdout = '';
+      let completed = false; // Flag to prevent multiple resolve/reject calls
 
       ytDlp.stdout.on('data', (data) => {
         stdout += data.toString();
@@ -84,6 +85,10 @@ const downloadVideo = async (url, outputDir = env.uploadDir) => {
       });
 
       ytDlp.on('close', async (code) => {
+        if (completed) return; // Prevent handling if already completed
+        completed = true;
+        clearTimeout(timeout);
+
         if (code === 0) {
           try {
             // Verify file exists and has content
@@ -131,6 +136,10 @@ const downloadVideo = async (url, outputDir = env.uploadDir) => {
       });
 
       ytDlp.on('error', (error) => {
+        if (completed) return; // Prevent handling if already completed
+        completed = true;
+        clearTimeout(timeout);
+        
         logger.error(`yt-dlp process error: ${error.message}`, { downloadId });
         const err = new Error('Video download service error');
         err.code = 'PROCESS_ERROR';
@@ -140,14 +149,15 @@ const downloadVideo = async (url, outputDir = env.uploadDir) => {
 
       // Set timeout for entire download process
       const timeout = setTimeout(() => {
+        if (completed) return; // Prevent if already completed
+        completed = true;
+        
         ytDlp.kill();
         logger.warn(`Download timeout after ${env.videoTimeoutMinutes} minutes`, { downloadId });
         const error = new Error(`Download timeout after ${env.videoTimeoutMinutes} minutes`);
         error.code = 'DOWNLOAD_TIMEOUT';
         reject(error);
       }, env.videoTimeoutMinutes * 60 * 1000);
-
-      ytDlp.on('close', () => clearTimeout(timeout));
     });
   } catch (error) {
     logger.error(`Download error: ${error.message}`, { url });
@@ -199,7 +209,12 @@ const getVideoMetadata = async (url) => {
         stderr += data.toString();
       });
 
+      let completed = false; // Flag to prevent multiple resolve/reject calls
+
       ytDlp.on('close', (code) => {
+        if (completed) return; // Prevent handling if already completed
+        completed = true;
+        clearTimeout(timeout);
         if (code === 0) {
           try {
             const metadata = JSON.parse(output);
@@ -233,6 +248,10 @@ const getVideoMetadata = async (url) => {
       });
 
       ytDlp.on('error', (error) => {
+        if (completed) return; // Prevent if already completed
+        completed = true;
+        clearTimeout(timeout);
+        
         const err = new Error('Metadata fetch service error');
         err.code = 'PROCESS_ERROR';
         reject(err);
@@ -240,13 +259,14 @@ const getVideoMetadata = async (url) => {
 
       // Set timeout
       const timeout = setTimeout(() => {
+        if (completed) return; // Prevent if already completed
+        completed = true;
+        
         ytDlp.kill();
         const error = new Error('Metadata fetch timeout');
         error.code = 'METADATA_TIMEOUT';
         reject(error);
       }, 30000); // 30 second timeout
-
-      ytDlp.on('close', () => clearTimeout(timeout));
     });
   } catch (error) {
     logger.error(`Metadata error: ${error.message}`, { url });

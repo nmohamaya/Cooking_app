@@ -64,6 +64,8 @@ const extractAudio = async (videoPath, outputDir, quality = 'MEDIUM') => {
 
       let stderr = '';
 
+      let completed = false; // Flag to prevent multiple resolve/reject calls
+
       ffmpeg.stderr.on('data', (data) => {
         stderr += data.toString();
         // Log ffmpeg progress (contains timing info)
@@ -74,6 +76,10 @@ const extractAudio = async (videoPath, outputDir, quality = 'MEDIUM') => {
       });
 
       ffmpeg.on('close', async (code) => {
+        if (completed) return; // Prevent handling if already completed
+        completed = true;
+        clearTimeout(timeout);
+
         if (code === 0) {
           try {
             // Verify audio file exists and has content
@@ -130,6 +136,10 @@ const extractAudio = async (videoPath, outputDir, quality = 'MEDIUM') => {
       });
 
       ffmpeg.on('error', (error) => {
+        if (completed) return; // Prevent if already completed
+        completed = true;
+        clearTimeout(timeout);
+        
         logger.error(`ffmpeg process error: ${error.message}`, { audioId });
         const err = new Error('Audio extraction service error');
         err.code = 'PROCESS_ERROR';
@@ -139,14 +149,15 @@ const extractAudio = async (videoPath, outputDir, quality = 'MEDIUM') => {
 
       // Set timeout for extraction (10 minutes max)
       const timeout = setTimeout(() => {
+        if (completed) return; // Prevent if already completed
+        completed = true;
+        
         ffmpeg.kill();
         logger.warn(`Audio extraction timeout`, { audioId });
         const error = new Error('Audio extraction timeout (10 min max)');
         error.code = 'EXTRACTION_TIMEOUT';
         reject(error);
       }, 10 * 60 * 1000);
-
-      ffmpeg.on('close', () => clearTimeout(timeout));
     });
   } catch (error) {
     logger.error(`Audio extraction error: ${error.message}`, { videoPath });
@@ -173,11 +184,17 @@ const getAudioDuration = async (audioPath) => {
 
       let output = '';
 
+      let completed = false; // Flag to prevent multiple resolve/reject calls
+
       ffprobe.stdout.on('data', (data) => {
         output += data.toString();
       });
 
       ffprobe.on('close', (code) => {
+        if (completed) return; // Prevent handling if already completed
+        completed = true;
+        clearTimeout(timeout);
+
         if (code === 0) {
           const duration = parseFloat(output.trim());
           logger.info(`Audio duration: ${duration.toFixed(2)}s`);
@@ -190,6 +207,10 @@ const getAudioDuration = async (audioPath) => {
       });
 
       ffprobe.on('error', (error) => {
+        if (completed) return; // Prevent if already completed
+        completed = true;
+        clearTimeout(timeout);
+        
         const err = new Error('Audio duration fetch service error');
         err.code = 'PROCESS_ERROR';
         reject(err);
@@ -197,11 +218,12 @@ const getAudioDuration = async (audioPath) => {
 
       // Set timeout
       const timeout = setTimeout(() => {
+        if (completed) return; // Prevent if already completed
+        completed = true;
+        
         ffprobe.kill();
         reject(new Error('Audio duration fetch timeout'));
       }, 30000);
-
-      ffprobe.on('close', () => clearTimeout(timeout));
     });
   } catch (error) {
     logger.error(`Duration error: ${error.message}`, { audioPath });

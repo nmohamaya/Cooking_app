@@ -57,7 +57,7 @@ describe('Server Setup - Issue #110', () => {
         .send({ url: 'https://youtube.com/watch?v=test' });
       
       // Download endpoint returns 202 (Accepted) for valid request
-      expect([202, 400, 500]).toContain(res.status);
+      expect(res.status).toBe(202);
       expect(res.body).toBeDefined();
     });
   });

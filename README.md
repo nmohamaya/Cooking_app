@@ -158,6 +158,12 @@ For iOS changes:
 - Mark conversations as resolved
 - Request re-review when ready
 
+**For handling non-critical comments and creating technical debt issues**: See [CONTRIBUTING.md - Handling Code Review Comments](./CONTRIBUTING.md#-handling-code-review-comments) for detailed guidance on:
+- Prioritizing fixes vs. deferred work
+- Creating technical debt issues for unfixed comments
+- Adding PR comments that link to the created issue
+- Ensuring team visibility and accountability
+
 #### Step 7: Manual QA Testing
 Once all verification passes, test on actual devices:
 - **Android**: Install APK on device/emulator, test all workflows

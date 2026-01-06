@@ -53,6 +53,22 @@ See [README.md#why-pre-merge-verification-matters](./README.md#why-pre-merge-ver
 - [ ] Request re-review when ready
 - [ ] All CI/CD checks pass
 
+### ✅ Handling Code Review Comments
+- [ ] Fix all **critical issues** identified in code review
+- [ ] **IMPORTANT**: For any non-critical comments/suggestions that are NOT fixed:
+  - [ ] Create a new issue labeled `technical-debt` with:
+    - Detailed description of each unfixed comment
+    - File references and line numbers
+    - Original reviewer suggestion/context
+    - Clear explanation of why it's deferred
+  - [ ] Add a comment to the PR linking to the technical debt issue with:
+    - Summary of deferred items
+    - Link to the issue (e.g., `[#122](https://github.com/nmohamaya/Cooking_app/issues/122)`)
+    - Reference to this guide for documentation consistency
+  - [ ] Link the technical debt issue in the PR description
+  - [ ] Get approval from maintainers before merge
+- [ ] Document which comments were addressed vs. deferred
+
 ### ✅ Manual QA Testing
 - [ ] Test on Android device/emulator
 - [ ] Test on iOS simulator (if applicable)
