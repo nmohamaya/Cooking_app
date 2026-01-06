@@ -1510,6 +1510,9 @@ function AppContent() {
     setShowMealRecipePicker(true);
   };
 
+  // Initialize screenContent - will be set by screen conditionals below
+  let screenContent = null;
+
   // Meal Plan screen (Weekly planner)
   if (screen === 'mealPlan') {
     screenContent = (
@@ -1769,9 +1772,6 @@ function AppContent() {
       </View>
     );
   }
-
-  // Render screen content with top tab navigation
-  let screenContent = null;
 
   // Home Screen
   if (screen === 'home') {
