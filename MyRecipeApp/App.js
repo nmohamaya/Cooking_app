@@ -17,6 +17,7 @@ import {
   CreateTimerModal, 
   TimerSuggestionsModal 
 } from './components/TimerComponents';
+import { NavigationContainer } from '@react-navigation/native';
 
 // Predefined categories and tags
 const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
@@ -28,7 +29,7 @@ const EXTRACTION_FEEDBACK_KEY = 'extractionFeedback';
 const MAX_EXTRACTION_HISTORY = 10;
 const TIMERS_STORAGE_KEY = 'cookingTimers';
 
-export default function App() {
+function AppContent() {
   const [recipes, setRecipes] = useState([]);
   const [screen, setScreen] = useState('home'); // 'home', 'add', 'detail', 'edit'
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -3234,6 +3235,14 @@ export default function App() {
       </ScrollView>
     );
   }
+}
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <AppContent />
+    </NavigationContainer>
+  );
 }
 
 const styles = StyleSheet.create({
