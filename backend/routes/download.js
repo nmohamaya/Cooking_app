@@ -18,6 +18,57 @@ const { v4: uuidv4 } = require('uuid');
 // In production, this would be a database
 const downloadQueue = new Map();
 
+// Warning about in-memory storage limitations
+logger.warn('Download queue is using in-memory storage; all download jobs will be lost on server restart. Configure persistent storage for production use.');
+
+// Cleanup configuration to prevent unbounded memory growth
+const JOB_TTL_MS = 24 * 60 * 60 * 1000;       // 24 hours
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;    // 1 hour
+const MAX_QUEUE_SIZE = 1000;                  // Maximum number of jobs to retain
+
+// Periodically clean up old or excess jobs from the in-memory queue
+const cleanupInterval = setInterval(() => {
+  const now = Date.now();
+  
+  // Remove jobs older than the TTL
+  for (const [jobId, job] of downloadQueue.entries()) {
+    if (!job || !job.startTime) continue;
+    const startTime = job.startTime instanceof Date
+      ? job.startTime.getTime()
+      : new Date(job.startTime).getTime();
+    if (Number.isNaN(startTime)) continue;
+    if (now - startTime > JOB_TTL_MS) {
+      downloadQueue.delete(jobId);
+    }
+  }
+  
+  // Enforce maximum size by removing oldest jobs
+  if (downloadQueue.size > MAX_QUEUE_SIZE) {
+    const jobsWithStartTime = [];
+    for (const [jobId, job] of downloadQueue.entries()) {
+      if (!job || !job.startTime) continue;
+      const startTime = job.startTime instanceof Date
+        ? job.startTime.getTime()
+        : new Date(job.startTime).getTime();
+      if (Number.isNaN(startTime)) continue;
+      jobsWithStartTime.push({ jobId, startTime });
+    }
+    jobsWithStartTime.sort((a, b) => a.startTime - b.startTime);
+    let removed = 0;
+    for (const { jobId } of jobsWithStartTime) {
+      if (downloadQueue.size <= MAX_QUEUE_SIZE) break;
+      downloadQueue.delete(jobId);
+      removed++;
+    }
+    if (removed > 0) logger.info(`Cleaned up ${removed} old download jobs from queue`);
+  }
+}, CLEANUP_INTERVAL_MS);
+
+// Allow process to exit naturally even if cleanup interval is active
+if (typeof cleanupInterval.unref === 'function') {
+  cleanupInterval.unref();
+}
+
 /**
  * POST /api/download
  * Start video download and audio extraction
@@ -146,7 +197,7 @@ async function processDownload(jobId, url, quality) {
     // Step 1: Get metadata
     logger.info(`[${jobId}] Fetching metadata...`);
     job.steps.metadata = 'processing';
-    const metadata = await downloadService.getVideoMetadata(url);
+    await downloadService.getVideoMetadata(url); // Validates URL exists and is accessible
     job.steps.metadata = 'completed';
     job.progress = 25;
 
@@ -154,6 +205,7 @@ async function processDownload(jobId, url, quality) {
     logger.info(`[${jobId}] Downloading video...`);
     job.steps.download = 'processing';
     const downloadResult = await downloadService.downloadVideo(url, env.uploadDir);
+    job.videoPath = downloadResult.filePath; // Store for cleanup on error
     job.steps.download = 'completed';
     job.progress = 50;
 
@@ -165,6 +217,7 @@ async function processDownload(jobId, url, quality) {
       env.uploadDir,
       quality
     );
+    job.audioPath = audioResult.audioPath; // Store for cleanup on error
     job.steps.audioExtraction = 'completed';
     job.progress = 100;
 
@@ -173,11 +226,6 @@ async function processDownload(jobId, url, quality) {
 
     // Update job with results
     job.status = 'completed';
-    job.audioPath = audioResult.audioPath;
-    job.audioId = audioResult.audioId;
-    job.duration = audioResult.duration;
-    job.size = audioResult.size;
-    job.quality = quality;
     job.completedTime = new Date();
 
     logger.info(`[${jobId}] Download and extraction complete`, {
@@ -190,12 +238,20 @@ async function processDownload(jobId, url, quality) {
     job.error = error.message;
     job.errorCode = error.code;
 
-    // Cleanup any downloaded files
-    if (job.videoPath) {
-      await downloadService.cleanupVideo(job.videoPath);
+    // Cleanup any downloaded files if they were created
+    if (job.videoPath && typeof job.videoPath === 'string') {
+      try {
+        await downloadService.cleanupVideo(job.videoPath);
+      } catch (cleanupError) {
+        logger.warn(`[${jobId}] Failed to cleanup video:`, cleanupError.message);
+      }
     }
-    if (job.audioPath) {
-      await audioService.cleanupAudio(job.audioPath);
+    if (job.audioPath && typeof job.audioPath === 'string') {
+      try {
+        await audioService.cleanupAudio(job.audioPath);
+      } catch (cleanupError) {
+        logger.warn(`[${jobId}] Failed to cleanup audio:`, cleanupError.message);
+      }
     }
   }
 }
@@ -224,12 +280,20 @@ router.delete('/:jobId', async (req, res) => {
       });
     }
 
-    // Cleanup files if they exist
-    if (job.videoPath) {
-      await downloadService.cleanupVideo(job.videoPath);
+    // Cleanup files only if paths exist and are valid strings
+    if (job.videoPath && typeof job.videoPath === 'string') {
+      try {
+        await downloadService.cleanupVideo(job.videoPath);
+      } catch (err) {
+        logger.warn(`[${jobId}] Error cleaning up video:`, err.message);
+      }
     }
-    if (job.audioPath) {
-      await audioService.cleanupAudio(job.audioPath);
+    if (job.audioPath && typeof job.audioPath === 'string') {
+      try {
+        await audioService.cleanupAudio(job.audioPath);
+      } catch (err) {
+        logger.warn(`[${jobId}] Error cleaning up audio:`, err.message);
+      }
     }
 
     // Remove from queue

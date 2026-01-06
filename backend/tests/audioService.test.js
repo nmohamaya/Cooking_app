@@ -81,34 +81,7 @@ describe('Audio Service - Issue #111', () => {
     });
   });
 
-  describe('File Cleanup', () => {
-    it('should handle cleanup gracefully', async () => {
-      const { cleanupAudio } = require('../services/audioService');
-      
-      // This should not throw an error
-      try {
-        // Attempting to clean non-existent file should log warning, not error
-        expect(true).toBe(true);
-      } catch (error) {
-        fail('Cleanup should not throw for missing files');
-      }
-    });
-  });
+  // Cleanup and error code tests skipped pending implementation of proper error triggering
+  // TODO: Add tests that actually trigger errors in extractAudio and cleanup functions
 
-  describe('Error Handling', () => {
-    it('should define proper error codes for different failure scenarios', () => {
-      const errorCodes = [
-        'EXTRACTION_FAILED',
-        'PROCESS_ERROR',
-        'EXTRACTION_TIMEOUT',
-        'DURATION_ERROR'
-      ];
-
-      // Verify error codes are descriptive
-      errorCodes.forEach(code => {
-        expect(code).toMatch(/^[A-Z_]+$/);
-        expect(code.length).toBeGreaterThan(0);
-      });
-    });
-  });
 });

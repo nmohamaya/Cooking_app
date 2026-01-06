@@ -207,7 +207,7 @@ const getVideoMetadata = async (url) => {
 
             // Check if video is too long
             if (duration > env.maxVideoDurationHours * 3600) {
-              throw new Error(`Video too long (${(duration / 3600).toFixed(2)} hours, max ${env.maxVideoDurationHours})`);
+              throw new Error(`Video is too long (${(duration / 3600).toFixed(2)} hours, max ${env.maxVideoDurationHours})`);
             }
 
             logger.info(`Metadata fetched: ${metadata.title}`, {

@@ -76,18 +76,7 @@ describe('Download Service - Issue #111', () => {
     });
   });
 
-  describe('File Cleanup', () => {
-    it('should handle cleanup gracefully for non-existent files', async () => {
-      // Mock test - actual cleanup tested in integration tests
-      const { cleanupVideo } = require('../services/downloadService');
-      
-      // This should not throw an error
-      try {
-        // Attempting to clean non-existent file should log warning, not error
-        expect(true).toBe(true);
-      } catch (error) {
-        fail('Cleanup should not throw for missing files');
-      }
-    });
-  });
+  // Cleanup tests skipped pending implementation of proper file system mocking
+  // TODO: Add cleanup tests using jest mock file system or temp directory
+
 });

@@ -15,9 +15,9 @@ const { v4: uuidv4 } = require('uuid');
  * Audio quality presets
  */
 const AUDIO_QUALITY = {
-  LOW: { bitrate: '64k', sampleRate: '16000' },     // Transcription only
-  MEDIUM: { bitrate: '128k', sampleRate: '16000' },  // Transcription + quality
-  HIGH: { bitrate: '192k', sampleRate: '44100' }     // Full quality
+  LOW: { sampleRate: '16000' },     // Transcription only (PCM 16-bit lossless)
+  MEDIUM: { sampleRate: '16000' },  // Transcription + quality (PCM 16-bit lossless)
+  HIGH: { sampleRate: '44100' }     // Full quality (PCM 16-bit lossless, 44.1kHz)
 };
 
 /**
@@ -57,9 +57,8 @@ const extractAudio = async (videoPath, outputDir, quality = 'MEDIUM') => {
         '-i', videoPath,
         '-vn', // No video
         '-acodec', 'pcm_s16le', // PCM 16-bit audio
-        '-ar', qualitySettings.sampleRate, // Sample rate
+        '-ar', qualitySettings.sampleRate, // Sample rate (controls effective quality for PCM)
         '-ac', '1', // Mono
-        '-q:a', '9', // Quality
         audioPath
       ]);
 
