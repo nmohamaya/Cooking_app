@@ -1621,7 +1621,7 @@ function AppContent() {
                 });
               });
             });
-            setShoppingList(items);
+            saveShoppingList(items);
             setScreen('shopping');
           }}
         />
