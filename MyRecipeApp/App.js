@@ -18,6 +18,7 @@ import {
   TimerSuggestionsModal 
 } from './components/TimerComponents';
 import { NavigationContainer } from '@react-navigation/native';
+import TopTabBar from './components/TopTabBar';
 
 // Predefined categories and tags
 const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
@@ -1511,7 +1512,7 @@ function AppContent() {
 
   // Meal Plan screen (Weekly planner)
   if (screen === 'mealPlan') {
-    return (
+    screenContent = (
       <>
         <View style={styles.container}>
           <View style={[styles.headerButtons, { paddingHorizontal: 16, paddingTop: 12 }]}>
@@ -1597,7 +1598,7 @@ function AppContent() {
 
   // Shopping List Generator screen (from meal plan)
   if (screen === 'shoppingGenerator') {
-    return (
+    screenContent = (
       <View style={styles.container}>
         <ShoppingListView 
           onBack={() => setScreen('mealPlan')} 
@@ -1630,7 +1631,7 @@ function AppContent() {
     const uncheckedItems = shoppingList.filter(item => !item.checked);
     const checkedItems = shoppingList.filter(item => item.checked);
 
-    return (
+    screenContent = (
       <View style={styles.container}>
         <Text style={styles.header}>Shopping List</Text>
         
@@ -1769,12 +1770,15 @@ function AppContent() {
     );
   }
 
+  // Render screen content with top tab navigation
+  let screenContent = null;
+
   // Home Screen
   if (screen === 'home') {
     const filteredRecipes = getFilteredRecipes();
     const activeFilters = getActiveFilterCount();
 
-    return (
+    screenContent = (
       <View style={styles.container}>
         <Text style={styles.header}>My Recipes</Text>
         <View style={styles.headerButtons}>
@@ -2232,7 +2236,7 @@ function AppContent() {
 
   // Add Recipe Screen
   if (screen === 'add') {
-    return (
+    screenContent = (
       <ScrollView style={styles.container}>
         <Text style={styles.header}>Add Recipe</Text>
         
@@ -2630,7 +2634,7 @@ function AppContent() {
 
   // Recipe Detail Screen
   if (screen === 'detail' && selectedRecipe) {
-    return (
+    screenContent = (
       <ScrollView style={styles.container}>
         <Text style={styles.header}>{selectedRecipe.title}</Text>
         
@@ -2840,7 +2844,7 @@ function AppContent() {
 
   // Edit Recipe Screen
   if (screen === 'edit' && selectedRecipe) {
-    return (
+    screenContent = (
       <ScrollView style={styles.container}>
         <Text style={styles.header}>Edit Recipe</Text>
         
@@ -3235,6 +3239,16 @@ function AppContent() {
       </ScrollView>
     );
   }
+
+  // Return wrapped with TopTabBar
+  return (
+    <View style={{ flex: 1 }}>
+      <TopTabBar activeTab={screen} onTabChange={setScreen} />
+      <View style={{ flex: 1 }}>
+        {screenContent}
+      </View>
+    </View>
+  );
 }
 
 export default function App() {
