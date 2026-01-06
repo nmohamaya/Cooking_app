@@ -202,6 +202,17 @@ git push origin :feature/issue-XX-description  # Delete remote branch
 
 For large features broken into multiple phases (like Issue #20: Video Transcription), use this specialized workflow:
 
+### 📊 Status Tracking
+
+Keep the [status.md](./status.md) file updated throughout development:
+- Update after each phase completion with metrics and deliverables
+- Document any major decisions or pivots
+- Track blockers, dependencies, and next steps
+- Update weekly during active development
+- Reference this file for project context and history
+
+This ensures the team has visibility into progress and can quickly understand what's been done and what's remaining.
+
 ### Phase Implementation Strategy
 
 **Overview**: Each phase is a separate sub-issue with its own PR, allowing incremental development and review.
