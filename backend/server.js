@@ -30,10 +30,11 @@ app.get('/api/version', (req, res) => {
   });
 });
 
-// Routes (will be added in subsequent phases)
-app.use('/api/transcribe', require('./routes/transcribe'));
-app.use('/api/recipes', require('./routes/recipes'));
-app.use('/api/cost', require('./routes/cost'));
+// Routes
+app.use('/api/download', require('./routes/download')); // Phase 2
+// app.use('/api/transcribe', require('./routes/transcribe')); // Phase 3
+// app.use('/api/recipes', require('./routes/recipes')); // Phase 4
+// app.use('/api/cost', require('./routes/cost')); // Phase 6
 
 // 404 handler
 app.use((req, res) => {
