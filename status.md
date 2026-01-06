@@ -59,15 +59,19 @@
 
 ---
 
-### Phase 2: Video Download & Audio Extraction (Issue #111) 🔄 IN REVIEW
-- **Status**: 🔄 PR #119 (In Review - 17 review comments addressed, technical debt fixed)
+### Phase 2: Video Download & Audio Extraction (Issue #111) ✅ READY FOR MERGE
+- **Status**: ✅ PR #119 (All review items resolved, ready for merge to main)
+- **Code Review**: 17 comments addressed ✅ | Technical debt #122-123 resolved ✅
+- **Test Coverage**: 34 tests passing ✅
+- **Next Step**: Merge to main, then proceed to Phase 4
 - **Deliverables**:
-  - Video download service (yt-dlp integration)
-  - Audio extraction service (ffmpeg)
-  - Download job queue management
+  - Video download service (yt-dlp integration) - YouTube, TikTok, Instagram, Twitter, Facebook
+  - Audio extraction service (ffmpeg) - WAV PCM 16-bit mono
+  - Download job queue management - 24h TTL, max 1000 jobs
   - Async API endpoints with progress tracking
   - Metadata fetching and validation
-  - Comprehensive error handling
+  - Comprehensive error handling with timeout race condition prevention
+  - Jest diagnostics enabled for resource leak detection
   - Timeout race condition prevention
   - Jest diagnostics improvements
 - **Tests**: 34 passing
@@ -170,21 +174,44 @@
 
 ---
 
-### Phase 4: Recipe Extraction Pipeline (Issue #113) ⏳ PENDING
-- **Status**: ⏳ Not Started
-- **Requirements**:
-  - Parse transcribed text to structured recipe
-  - Extract ingredients, steps, cooking times, temperatures
-  - Validate and enhance extracted data
-  - Create extraction service and routes
-  - Comprehensive tests
-- **Dependencies**: Phase 3 ✅ Complete
-- **Estimated Timeline**: 2-3 days
+### Phase 4: Recipe Extraction Pipeline (Issue #113) 🔄 IN PROGRESS
+- **Status**: 🔄 Ready to start - Planning phase
+- **Description**: Parse transcribed text into structured recipe format
+- **Deliverables**:
+  - Recipe extraction service (parse transcription → recipe JSON)
+  - Ingredient parsing with quantities and units
+  - Step extraction and normalization
+  - Cooking time and temperature detection
+  - Validation and data enhancement
+  - Error handling and fallbacks
+  - API endpoints for extraction
+  - Comprehensive test coverage
+- **Dependencies**: Phase 3 ✅ (Transcription), Phase 2 ✅ (Audio/Video)
+- **Estimated Timeline**: 3-4 days
+
+**Architecture**:
+- `backend/services/recipeExtractionService.js` - Core extraction logic
+- `backend/routes/recipes.js` - API endpoints for extraction
+- `backend/tests/recipeExtractionService.test.js` - Test suite
+
+**Key Features**:
+- Extract ingredients with quantities and units
+- Identify cooking steps with timing information
+- Detect temperature requirements
+- Handle missing or ambiguous data
+- Validate extracted recipe structure
+
+**Next Steps**:
+1. Create Issue #113 in GitHub
+2. Implement recipeExtractionService
+3. Add API routes for recipe extraction
+4. Write comprehensive tests
+5. Create pull request for review
 
 ---
 
 ### Phase 5: UI Integration (Issue #114) ⏳ PENDING
-- **Status**: ⏳ Not Started
+- **Status**: ⏳ Not Started (depends on Phase 4)
 - **Requirements**:
   - Video URL input screen
   - Transcription progress tracking
