@@ -49,3 +49,6 @@ web-build/
 # OS
 Thumbs.db
 .DS_Store
+# Developer Notes (Local Documentation)
+DEV_NOTES_*.md
+DEVELOPER_NOTES_*.md
