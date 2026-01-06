@@ -1783,21 +1783,6 @@ function AppContent() {
         <Text style={styles.header}>My Recipes</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity 
-            style={[styles.smallButton, { marginRight: 8, backgroundColor: '#FF6B6B' }]}
-            onPress={() => setScreen('mealPlan')}
-          >
-            <Text style={styles.smallButtonText}>📅 Meal Plan</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.smallButton, { marginRight: 8, backgroundColor: '#4CAF50' }]}
-            onPress={() => setScreen('shopping')}
-          >
-            <Text style={styles.smallButtonText}>
-              🛒 List {shoppingList.length > 0 ? `(${shoppingList.filter(i => !i.checked).length})` : ''}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
             style={[styles.smallButton, { marginRight: 8, backgroundColor: getRunningTimersCount() > 0 ? '#FF9800' : '#2196F3' }]}
             onPress={() => setShowTimerWidget(true)}
           >
