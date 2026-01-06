@@ -121,7 +121,7 @@ jobs:
     - name: Validate app configuration
       run: |
         cd MyRecipeApp
-        node -e "const config = require('./app.config.js'); const appConfig = config.default || config; console.log('✓ app.config.js is valid configuration');"
+        node -e "const config = require('./app.config.js'); console.log('✓ app.config.js is valid configuration');"
     
     - name: Check web build
       run: |
