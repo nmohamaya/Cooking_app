@@ -19,6 +19,7 @@ import {
 } from './components/TimerComponents';
 import { NavigationContainer } from '@react-navigation/native';
 import TopTabBar from './components/TopTabBar';
+import { colors, spacing, borderRadius, shadows } from './styles/theme';
 
 // Predefined categories and tags
 const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks', 'Appetizers', 'Asian', 'Vegan', 'Vegetarian'];
@@ -1520,10 +1521,10 @@ function AppContent() {
         <View style={styles.container}>
           <View style={[styles.headerButtons, { paddingHorizontal: 16, paddingTop: 12 }]}>
             <TouchableOpacity
-              style={[styles.smallButton, { backgroundColor: '#f0f0f0' }]}
+              style={[styles.smallButton, { backgroundColor: colors.bgSecondary }]}
               onPress={() => setScreen('home')}
             >
-              <Text style={[styles.smallButtonText, { color: '#333' }]}>← Back</Text>
+              <Text style={[styles.smallButtonText, { color: colors.textPrimary }]}>← Back</Text>
             </TouchableOpacity>
           </View>
 
@@ -1559,30 +1560,30 @@ function AppContent() {
 
               {!recipes || recipes.length === 0 ? (
                 <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 16, color: '#999' }}>No recipes available</Text>
+                  <Text style={{ fontSize: 16, color: colors.textTertiary }}>No recipes available</Text>
                 </View>
               ) : (
                 <ScrollView style={{ height: 300 }}>
                   {recipes.map((recipe) => (
                     <View key={recipe.id || Math.random()}>
                       <TouchableOpacity
-                        style={{ paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' }}
+                        style={{ paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.borderLight }}
                         onPress={() => {
                           console.log('Selected recipe:', recipe.title);
                           handleAddRecipeToMealSlot(recipe);
                         }}
                       >
-                        <Text style={{ fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 4 }}>{recipe.title || 'Untitled'}</Text>
-                        <Text style={{ fontSize: 13, color: '#999' }}>{recipe.category || 'N/A'}</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.textPrimary, marginBottom: 4 }}>{recipe.title || 'Untitled'}</Text>
+                        <Text style={{ fontSize: 13, color: colors.textTertiary }}>{recipe.category || 'N/A'}</Text>
                       </TouchableOpacity>
                     </View>
                   ))}
                 </ScrollView>
               )}
 
-              <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0' }}>
+              <View style={{ marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.borderLight }}>
                 <TouchableOpacity
-                  style={{ paddingVertical: 12, paddingHorizontal: 12, backgroundColor: '#666', borderRadius: 6, alignItems: 'center' }}
+                  style={{ paddingVertical: 12, paddingHorizontal: 12, backgroundColor: colors.accentDeep, borderRadius: borderRadius.small, alignItems: 'center' }}
                   onPress={() => {
                     console.log('Modal cancel');
                     setShowMealRecipePicker(false);
@@ -1647,13 +1648,13 @@ function AppContent() {
           <>
             <View style={styles.headerButtons}>
               <TouchableOpacity 
-                style={[styles.smallButton, { backgroundColor: '#4CAF50', marginRight: 8 }]}
+                style={[styles.smallButton, { backgroundColor: colors.success, marginRight: 8 }]}
                 onPress={shareShoppingList}
               >
                 <Text style={styles.smallButtonText}>📤 Share</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.smallButton, { backgroundColor: '#d32f2f' }]}
+                style={[styles.smallButton, { backgroundColor: colors.error }]}
                 onPress={clearShoppingList}
               >
                 <Text style={styles.smallButtonText}>🗑️ Clear</Text>
@@ -1705,7 +1706,7 @@ function AppContent() {
         )}
 
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#666' }]}
+          style={[styles.button, { backgroundColor: colors.accentDeep }]}
           onPress={() => setScreen('home')}
         >
           <Text style={styles.buttonText}>Back to Recipes</Text>
@@ -1734,7 +1735,7 @@ function AppContent() {
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#d32f2f' }]} 
+                  style={[styles.modalButton, { backgroundColor: colors.error }]} 
                   onPress={confirmClearShoppingList}
                 >
                   <Text style={styles.modalButtonText}>Clear All</Text>
@@ -1760,7 +1761,7 @@ function AppContent() {
               
               <View style={styles.modalButtons}>
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#2196F3' }]} 
+                  style={[styles.modalButton, { backgroundColor: colors.primaryWarm }]} 
                   onPress={() => setShowDuplicateModal(false)}
                 >
                   <Text style={styles.modalButtonText}>OK</Text>
@@ -2114,7 +2115,7 @@ function AppContent() {
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#d32f2f' }]} 
+                  style={[styles.modalButton, { backgroundColor: colors.error }]} 
                   onPress={confirmDelete}
                 >
                   <Text style={styles.modalButtonText}>Delete</Text>
@@ -2140,21 +2141,21 @@ function AppContent() {
               
               <View>
                 <TouchableOpacity 
-                  style={{ backgroundColor: '#4CAF50', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  style={{ backgroundColor: colors.success, width: '100%', marginBottom: 10, padding: 14, borderRadius: borderRadius.medium, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateAddAsVariant}
                 >
                   <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add as Variant</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={{ backgroundColor: '#2196F3', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  style={{ backgroundColor: colors.primaryWarm, width: '100%', marginBottom: 10, padding: 14, borderRadius: borderRadius.medium, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateAddAnyway}
                 >
                   <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add Anyway</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={{ backgroundColor: '#666666', width: '100%', padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  style={{ backgroundColor: colors.accentDeep, width: '100%', padding: 14, borderRadius: borderRadius.medium, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateCancel}
                 >
                   <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
@@ -2241,7 +2242,7 @@ function AppContent() {
         
         {/* Error display for extraction failures */}
         {extractionError && (
-          <View style={{ backgroundColor: '#ffebee', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#f44336' }}>
+          <View style={{ backgroundColor: '#ffebee', padding: 12, borderRadius: borderRadius.medium, marginBottom: 10, borderWidth: 1, borderColor: '#f44336' }}>
             <Text style={{ color: '#c62828', fontWeight: 'bold', marginBottom: 4 }}>❌ Extraction Failed</Text>
             <Text style={{ color: '#c62828', marginBottom: 8 }}>{extractionError.message}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -2257,7 +2258,7 @@ function AppContent() {
                 </TouchableOpacity>
               )}
               <TouchableOpacity 
-                style={{ backgroundColor: '#666', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
+                style={{ backgroundColor: colors.accentDeep, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
                 onPress={() => setExtractionError(null)}
               >
                 <Text style={{ color: '#fff' }}>Dismiss</Text>
@@ -2357,7 +2358,7 @@ function AppContent() {
         <TouchableOpacity style={styles.button} onPress={addRecipe}>
           <Text style={styles.buttonText}>Save Recipe</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#666' }]} onPress={() => setScreen('home')}>
+        <TouchableOpacity style={[styles.button, { backgroundColor: colors.accentDeep }]} onPress={() => setScreen('home')}>
           <Text style={styles.buttonText}>Cancel</Text>
         </TouchableOpacity>
 
@@ -2391,7 +2392,7 @@ function AppContent() {
                   </TouchableOpacity>
                   
                   {showHistoryDropdown && (
-                    <View style={{ backgroundColor: '#f5f5f5', borderRadius: 8, padding: 8, maxHeight: 150 }}>
+                    <View style={{ backgroundColor: colors.bgPrimary, borderRadius: borderRadius.medium, padding: 8, maxHeight: 150 }}>
                       <ScrollView>
                         {extractionHistory.map((item) => (
                           <TouchableOpacity 
@@ -2405,7 +2406,7 @@ function AppContent() {
                             <Text style={{ fontWeight: 'bold', fontSize: 14 }} numberOfLines={1}>
                               {item.resultTitle || 'Untitled'}
                             </Text>
-                            <Text style={{ fontSize: 12, color: '#666' }} numberOfLines={1}>
+                            <Text style={{ fontSize: 12, color: colors.textSecondary }} numberOfLines={1}>
                               {item.text}...
                             </Text>
                           </TouchableOpacity>
@@ -2487,7 +2488,7 @@ function AppContent() {
               
               <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginVertical: 20 }}>
                 <TouchableOpacity 
-                  style={{ padding: 20, backgroundColor: '#4CAF50', borderRadius: 50 }}
+                  style={{ padding: 20, backgroundColor: colors.success, borderRadius: 50 }}
                   onPress={() => saveFeedback(true, feedbackComment)}
                 >
                   <Text style={{ fontSize: 32 }}>👍</Text>
@@ -2538,21 +2539,21 @@ function AppContent() {
               
               <View>
                 <TouchableOpacity 
-                  style={{ backgroundColor: '#4CAF50', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  style={{ backgroundColor: colors.success, width: '100%', marginBottom: 10, padding: 14, borderRadius: borderRadius.medium, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateAddAsVariant}
                 >
                   <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add as Variant</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={{ backgroundColor: '#2196F3', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  style={{ backgroundColor: colors.primaryWarm, width: '100%', marginBottom: 10, padding: 14, borderRadius: borderRadius.medium, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateAddAnyway}
                 >
                   <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add Anyway</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={{ backgroundColor: '#666666', width: '100%', padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  style={{ backgroundColor: colors.accentDeep, width: '100%', padding: 14, borderRadius: borderRadius.medium, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateCancel}
                 >
                   <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
@@ -2666,7 +2667,7 @@ function AppContent() {
         <Text style={styles.detail}>{selectedRecipe.instructions}</Text>
 
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#4CAF50' }]}
+          style={[styles.button, { backgroundColor: colors.success }]}
           onPress={() => addRecipeToShoppingList(selectedRecipe)}
         >
           <Text style={styles.buttonText}>🛒 Add to Shopping List</Text>
@@ -2700,13 +2701,13 @@ function AppContent() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#d32f2f' }]}
+          style={[styles.button, { backgroundColor: colors.error }]}
           onPress={() => deleteRecipe(selectedRecipe.id)}
         >
           <Text style={styles.buttonText}>Delete</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#666' }]} onPress={() => setScreen('home')}>
+        <TouchableOpacity style={[styles.button, { backgroundColor: colors.accentDeep }]} onPress={() => setScreen('home')}>
           <Text style={styles.buttonText}>Back</Text>
         </TouchableOpacity>
 
@@ -2736,7 +2737,7 @@ function AppContent() {
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#d32f2f' }]} 
+                  style={[styles.modalButton, { backgroundColor: colors.error }]} 
                   onPress={confirmDelete}
                 >
                   <Text style={styles.modalButtonText}>Delete</Text>
@@ -2762,7 +2763,7 @@ function AppContent() {
               
               <View style={styles.modalButtons}>
                 <TouchableOpacity 
-                  style={[styles.modalButton, { backgroundColor: '#2196F3' }]} 
+                  style={[styles.modalButton, { backgroundColor: colors.primaryWarm }]} 
                   onPress={() => setShowDuplicateModal(false)}
                 >
                   <Text style={styles.modalButtonText}>OK</Text>
@@ -2849,7 +2850,7 @@ function AppContent() {
         
         {/* Error display for extraction failures */}
         {extractionError && (
-          <View style={{ backgroundColor: '#ffebee', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#f44336' }}>
+          <View style={{ backgroundColor: '#ffebee', padding: 12, borderRadius: borderRadius.medium, marginBottom: 10, borderWidth: 1, borderColor: '#f44336' }}>
             <Text style={{ color: '#c62828', fontWeight: 'bold', marginBottom: 4 }}>❌ Extraction Failed</Text>
             <Text style={{ color: '#c62828', marginBottom: 8 }}>{extractionError.message}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -2865,7 +2866,7 @@ function AppContent() {
                 </TouchableOpacity>
               )}
               <TouchableOpacity 
-                style={{ backgroundColor: '#666', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
+                style={{ backgroundColor: colors.accentDeep, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 }}
                 onPress={() => setExtractionError(null)}
               >
                 <Text style={{ color: '#fff' }}>Dismiss</Text>
@@ -2965,7 +2966,7 @@ function AppContent() {
         <TouchableOpacity style={styles.button} onPress={updateRecipe}>
           <Text style={styles.buttonText}>Save Changes</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#666' }]} onPress={() => setScreen('home')}>
+        <TouchableOpacity style={[styles.button, { backgroundColor: colors.accentDeep }]} onPress={() => setScreen('home')}>
           <Text style={styles.buttonText}>Cancel</Text>
         </TouchableOpacity>
 
@@ -2999,7 +3000,7 @@ function AppContent() {
                   </TouchableOpacity>
                   
                   {showHistoryDropdown && (
-                    <View style={{ backgroundColor: '#f5f5f5', borderRadius: 8, padding: 8, maxHeight: 150 }}>
+                    <View style={{ backgroundColor: colors.bgPrimary, borderRadius: borderRadius.medium, padding: 8, maxHeight: 150 }}>
                       <ScrollView>
                         {extractionHistory.map((item) => (
                           <TouchableOpacity 
@@ -3013,7 +3014,7 @@ function AppContent() {
                             <Text style={{ fontWeight: 'bold', fontSize: 14 }} numberOfLines={1}>
                               {item.resultTitle || 'Untitled'}
                             </Text>
-                            <Text style={{ fontSize: 12, color: '#666' }} numberOfLines={1}>
+                            <Text style={{ fontSize: 12, color: colors.textSecondary }} numberOfLines={1}>
                               {item.text}...
                             </Text>
                           </TouchableOpacity>
@@ -3095,7 +3096,7 @@ function AppContent() {
               
               <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginVertical: 20 }}>
                 <TouchableOpacity 
-                  style={{ padding: 20, backgroundColor: '#4CAF50', borderRadius: 50 }}
+                  style={{ padding: 20, backgroundColor: colors.success, borderRadius: 50 }}
                   onPress={() => saveFeedback(true, feedbackComment)}
                 >
                   <Text style={{ fontSize: 32 }}>👍</Text>
@@ -3146,21 +3147,21 @@ function AppContent() {
               
               <View>
                 <TouchableOpacity 
-                  style={{ backgroundColor: '#4CAF50', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  style={{ backgroundColor: colors.success, width: '100%', marginBottom: 10, padding: 14, borderRadius: borderRadius.medium, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateAddAsVariant}
                 >
                   <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add as Variant</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={{ backgroundColor: '#2196F3', width: '100%', marginBottom: 10, padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  style={{ backgroundColor: colors.primaryWarm, width: '100%', marginBottom: 10, padding: 14, borderRadius: borderRadius.medium, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateAddAnyway}
                 >
                   <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Add Anyway</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={{ backgroundColor: '#666666', width: '100%', padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }} 
+                  style={{ backgroundColor: colors.accentDeep, width: '100%', padding: 14, borderRadius: borderRadius.medium, alignItems: 'center', justifyContent: 'center' }} 
                   onPress={handleDuplicateCancel}
                 >
                   <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
@@ -3247,8 +3248,8 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
-    backgroundColor: '#f5f5f5',
+    padding: spacing.lg,
+    backgroundColor: colors.bgPrimary,
   },
   header: {
     fontSize: 24,
@@ -3269,9 +3270,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   smallButton: {
-    backgroundColor: '#007AFF',
-    padding: 8,
-    borderRadius: 6,
+    backgroundColor: colors.primaryWarm,
+    padding: spacing.sm,
+    borderRadius: borderRadius.small,
     alignItems: 'center',
     flex: 1,
     maxWidth: 120,
@@ -3282,18 +3283,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   recipeItem: {
-    backgroundColor: 'white',
-    padding: 12,
+    backgroundColor: colors.bgPrimary,
+    padding: spacing.md,
     marginBottom: 8,
-    borderRadius: 6,
+    borderRadius: borderRadius.small,
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderLeftColor: colors.primaryWarm,
     flexDirection: 'row',
   },
   recipeThumbnail: {
     width: 60,
     height: 60,
-    borderRadius: 6,
+    borderRadius: borderRadius.small,
     marginRight: 12,
   },
   recipeInfo: {
@@ -3306,7 +3307,7 @@ const styles = StyleSheet.create({
   },
   recipeCategory: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
     marginTop: 3,
   },
   videoIndicator: {
@@ -3317,28 +3318,28 @@ const styles = StyleSheet.create({
   previewImage: {
     width: '100%',
     height: 200,
-    borderRadius: 8,
+    borderRadius: borderRadius.medium,
     marginBottom: 10,
   },
   detailImage: {
     width: '100%',
     height: 250,
-    borderRadius: 8,
+    borderRadius: borderRadius.medium,
     marginBottom: 15,
   },
   input: {
-    backgroundColor: 'white',
-    borderRadius: 6,
-    padding: 10,
+    backgroundColor: colors.bgPrimary,
+    borderRadius: borderRadius.small,
+    padding: spacing.md,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.borderLight,
     fontSize: 14,
   },
   button: {
-    backgroundColor: '#007AFF',
-    padding: 12,
-    borderRadius: 6,
+    backgroundColor: colors.primaryWarm,
+    padding: spacing.md,
+    borderRadius: borderRadius.small,
     marginBottom: 8,
     alignItems: 'center',
   },
@@ -3349,14 +3350,14 @@ const styles = StyleSheet.create({
   },
   detail: {
     fontSize: 14,
-    color: '#333',
+    color: colors.textPrimary,
     marginBottom: 8,
     lineHeight: 20,
   },
   emptyText: {
     textAlign: 'center',
     fontSize: 16,
-    color: '#999',
+    color: colors.textTertiary,
     marginTop: 30,
   },
   loadingText: {
@@ -3371,12 +3372,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: spacing.xl,
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: colors.bgPrimary,
+    borderRadius: borderRadius.medium,
+    padding: spacing.xl,
     width: '100%',
     maxWidth: 500,
     maxHeight: '80%',
@@ -3389,34 +3390,34 @@ const styles = StyleSheet.create({
   },
   modalSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     marginBottom: 15,
     textAlign: 'center',
   },
   modalTextInput: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: colors.bgPrimary,
+    borderRadius: borderRadius.medium,
+    padding: spacing.md,
     minHeight: 200,
     maxHeight: 300,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.borderLight,
     fontSize: 14,
     marginBottom: 15,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: spacing.md,
   },
   modalButton: {
     flex: 1,
-    padding: 14,
-    borderRadius: 8,
+    padding: spacing.lg,
+    borderRadius: borderRadius.medium,
     alignItems: 'center',
   },
   modalButtonCancel: {
-    backgroundColor: '#666',
+    backgroundColor: colors.accentDeep,
   },
   modalButtonExtract: {
     backgroundColor: '#6366f1',
@@ -3430,24 +3431,24 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 8,
+    backgroundColor: colors.bgPrimary,
+    borderRadius: borderRadius.medium,
     paddingHorizontal: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.borderLight,
   },
   searchInput: {
     flex: 1,
-    padding: 10,
+    padding: spacing.md,
     fontSize: 15,
   },
   clearButton: {
-    padding: 5,
+    padding: spacing.xs,
   },
   clearButtonText: {
     fontSize: 18,
-    color: '#999',
+    color: colors.textTertiary,
   },
   filterBar: {
     flexDirection: 'row',
@@ -3456,10 +3457,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   filterButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryWarm,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 6,
+    borderRadius: borderRadius.small,
   },
   filterButtonText: {
     color: 'white',
@@ -3472,7 +3473,7 @@ const styles = StyleSheet.create({
   },
   sortLabel: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     marginRight: 5,
   },
   sortValue: {
@@ -3482,23 +3483,23 @@ const styles = StyleSheet.create({
   },
   resultCount: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
     marginBottom: 8,
     fontStyle: 'italic',
   },
   recipeMetadata: {
     flexDirection: 'row',
     marginTop: 4,
-    gap: 8,
+    gap: spacing.sm,
   },
   timeText: {
     fontSize: 12,
-    color: '#888',
+    color: colors.textSecondary,
   },
   filterModal: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: colors.bgPrimary,
+    borderRadius: borderRadius.large,
+    padding: spacing.xl,
     width: '100%',
     maxWidth: 400,
   },
@@ -3509,39 +3510,39 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 10,
-    color: '#333',
+    color: colors.textPrimary,
   },
   timeFilterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: spacing.sm,
   },
   timeChip: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.bgSecondary,
     paddingVertical: 8,
     paddingHorizontal: 14,
-    borderRadius: 20,
+    borderRadius: borderRadius.round,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.borderLight,
   },
   timeChipActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryWarm,
     borderColor: '#007AFF',
   },
   timeChipText: {
     fontSize: 13,
-    color: '#333',
+    color: colors.textPrimary,
   },
   timeChipClear: {
     backgroundColor: '#fff',
     paddingVertical: 8,
     paddingHorizontal: 14,
-    borderRadius: 20,
+    borderRadius: borderRadius.round,
     borderWidth: 1,
     borderColor: '#e53',
   },
   applyButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryWarm,
   },
   applyButtonText: {
     color: 'white',
@@ -3549,7 +3550,7 @@ const styles = StyleSheet.create({
   // Shopping List Styles
   shoppingListSummary: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     marginBottom: 15,
     textAlign: 'center',
     fontStyle: 'italic',
@@ -3557,10 +3558,10 @@ const styles = StyleSheet.create({
   shoppingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 12,
+    backgroundColor: colors.bgPrimary,
+    padding: spacing.md,
     marginBottom: 8,
-    borderRadius: 6,
+    borderRadius: borderRadius.small,
     borderLeftWidth: 3,
     borderLeftColor: '#4CAF50',
   },
@@ -3580,20 +3581,20 @@ const styles = StyleSheet.create({
   },
   shoppingItemText: {
     fontSize: 15,
-    color: '#333',
+    color: colors.textPrimary,
   },
   shoppingItemChecked: {
     textDecorationLine: 'line-through',
-    color: '#999',
+    color: colors.textTertiary,
   },
   shoppingItemRecipes: {
     fontSize: 12,
-    color: '#888',
+    color: colors.textSecondary,
     marginTop: 2,
     fontStyle: 'italic',
   },
   deleteItemButton: {
-    padding: 8,
+    padding: spacing.sm,
   },
   deleteItemText: {
     fontSize: 20,
@@ -3603,17 +3604,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
     marginBottom: 6,
     marginTop: 10,
     marginLeft: 4,
   },
   pickerContainer: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+    backgroundColor: colors.bgPrimary,
+    borderRadius: borderRadius.medium,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.borderLight,
   },
   picker: {
     height: 50,
@@ -3624,22 +3625,22 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tagChip: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 16,
+    backgroundColor: colors.bgSecondary,
+    borderRadius: borderRadius.large,
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginRight: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.borderLight,
   },
   tagChipSelected: {
-    backgroundColor: '#2196F3',
+    backgroundColor: colors.primaryWarm,
     borderColor: '#2196F3',
   },
   tagChipText: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
   },
   tagChipTextSelected: {
     color: '#fff',
@@ -3647,7 +3648,7 @@ const styles = StyleSheet.create({
   },
   tagChipDisplay: {
     backgroundColor: '#e3f2fd',
-    borderRadius: 12,
+    borderRadius: borderRadius.medium,
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginRight: 6,
@@ -3663,23 +3664,23 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   categoryFilterButton: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
+    backgroundColor: colors.bgPrimary,
+    borderRadius: borderRadius.round,
     paddingHorizontal: 16,
     paddingVertical: 8,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   categoryFilterButtonActive: {
-    backgroundColor: '#2196F3',
+    backgroundColor: colors.primaryWarm,
     borderColor: '#2196F3',
   },
   categoryFilterButtonText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   categoryFilterButtonTextActive: {
@@ -3688,7 +3689,7 @@ const styles = StyleSheet.create({
   },
   categoryBadge: {
     backgroundColor: '#e3f2fd',
-    borderRadius: 12,
+    borderRadius: borderRadius.medium,
     paddingHorizontal: 10,
     paddingVertical: 4,
     alignSelf: 'flex-start',
@@ -3707,7 +3708,7 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
     marginRight: 10,
   },
   // Recipe list item styles
@@ -3718,7 +3719,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.borderLight,
     backgroundColor: '#fff',
   },
   recipeListItemContent: {
@@ -3727,11 +3728,11 @@ const styles = StyleSheet.create({
   recipeListItemTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
   },
   recipeListItemCategory: {
     fontSize: 13,
-    color: '#999',
+    color: colors.textTertiary,
     marginTop: 4,
   },
   recipeListItemArrow: {
