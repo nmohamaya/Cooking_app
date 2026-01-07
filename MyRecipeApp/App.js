@@ -19,6 +19,7 @@ import {
 } from './components/TimerComponents';
 import { NavigationContainer } from '@react-navigation/native';
 import TopTabBar from './components/TopTabBar';
+import VideoRecipeExtractionWorkflow from './components/VideoRecipeExtractionWorkflow';
 import { colors, spacing, borderRadius, shadows } from './styles/theme';
 
 // Predefined categories and tags
@@ -37,6 +38,7 @@ function AppContent() {
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [extracting, setExtracting] = useState(false); // Loading state for extraction
   const [showExtractionModal, setShowExtractionModal] = useState(false);
+  const [showVideoExtractionModal, setShowVideoExtractionModal] = useState(false); // Video extraction modal
   const [extractionText, setExtractionText] = useState('');
   const [extractionHistory, setExtractionHistory] = useState([]); // Last 10 extractions
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
@@ -1275,6 +1277,21 @@ function AppContent() {
     setShowExtractionModal(true);
   };
 
+  // Handle video extraction completion
+  const handleVideoExtractionComplete = (extractedRecipe) => {
+    // Auto-fill the form with extracted data
+    setForm(prevForm => ({
+      ...prevForm,
+      title: extractedRecipe.title || prevForm.title,
+      ingredients: extractedRecipe.ingredients || prevForm.ingredients,
+      instructions: extractedRecipe.instructions || prevForm.instructions,
+      prepTime: extractedRecipe.prepTime || prevForm.prepTime,
+      cookTime: extractedRecipe.cookTime || prevForm.cookTime,
+      category: extractedRecipe.category || prevForm.category,
+    }));
+    setShowVideoExtractionModal(false);
+  };
+
   const performExtraction = async (textToExtract = null) => {
     const text = textToExtract || extractionText;
     if (!text || !text.trim()) {
@@ -2226,6 +2243,14 @@ function AppContent() {
       <ScrollView style={styles.container}>
         <Text style={styles.header}>Add Recipe</Text>
         
+        {/* Video Extraction Button */}
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: '#FF6B35', marginBottom: 10 }]} 
+          onPress={() => setShowVideoExtractionModal(true)}
+        >
+          <Text style={styles.buttonText}>🎥 Extract Recipe from Video</Text>
+        </TouchableOpacity>
+        
         {/* AI Extraction Button */}
         <TouchableOpacity 
           style={[styles.button, { backgroundColor: '#6366f1', marginBottom: 10 }]} 
@@ -2361,6 +2386,13 @@ function AppContent() {
         <TouchableOpacity style={[styles.button, { backgroundColor: colors.accentDeep }]} onPress={() => setScreen('home')}>
           <Text style={styles.buttonText}>Cancel</Text>
         </TouchableOpacity>
+
+        {/* Video Recipe Extraction Workflow Modal */}
+        <VideoRecipeExtractionWorkflow
+          visible={showVideoExtractionModal}
+          onClose={() => setShowVideoExtractionModal(false)}
+          onExtractComplete={handleVideoExtractionComplete}
+        />
 
         {/* Extraction Modal */}
         <Modal
