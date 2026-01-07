@@ -75,7 +75,9 @@ const VideoRecipeExtractionWorkflow = ({
       // Real extraction workflow
       await extractRecipeFromVideo();
     } catch (err) {
-      setError(err.message || 'Failed to extract recipe from video');
+      const errorMessage = err.message || 'Failed to extract recipe from video';
+      console.error('🚨 Extraction failed with error:', errorMessage);
+      setError(errorMessage);
       setIsProcessing(false);
       setStep('input');
     }
@@ -84,11 +86,14 @@ const VideoRecipeExtractionWorkflow = ({
   const extractRecipeFromVideo = async () => {
     try {
       // Step 1: Get video transcript based on URL platform
+      console.log('🎬 Starting video extraction for URL:', url);
       setProgressStep(1);
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       const provider = urlValidator.getVideoProvider(url);
       const videoId = urlValidator.extractVideoId(url);
+
+      console.log('📺 Detected provider:', provider, 'Video ID:', videoId);
 
       if (!videoId) {
         throw new Error(`Could not extract video ID from ${provider} URL`);
@@ -98,19 +103,25 @@ const VideoRecipeExtractionWorkflow = ({
 
       // Fetch transcript based on platform
       if (provider === 'youtube') {
+        console.log('📥 Fetching YouTube transcript...');
         const result = await getYoutubeTranscript(videoId, 'en');
+        console.log('YouTube result:', result);
         if (!result.success) {
           throw new Error(`YouTube: ${result.error || 'Could not retrieve video transcript'}`);
         }
         transcript = result.transcript;
       } else if (provider === 'tiktok') {
+        console.log('📥 Fetching TikTok content...');
         const result = await getTikTokContent(videoId);
+        console.log('TikTok result:', result);
         if (!result.success) {
           throw new Error(`TikTok: ${result.error || 'Could not retrieve video content'}`);
         }
         transcript = result.content;
       } else if (provider === 'instagram') {
+        console.log('📥 Fetching Instagram content...');
         const result = await getInstagramContent(videoId);
+        console.log('Instagram result:', result);
         if (!result.success) {
           throw new Error(`Instagram: ${result.error || 'Could not retrieve post content'}`);
         }
@@ -129,13 +140,17 @@ const VideoRecipeExtractionWorkflow = ({
         );
       }
 
+      console.log('✅ Transcript obtained, length:', transcript.length, 'chars');
+
       // Step 2: Extract audio (simulated - shows progress)
       setProgressStep(2);
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Step 3: Process with AI
       setProgressStep(3);
+      console.log('🤖 Sending transcript to AI for recipe extraction...');
       const recipe = await extractRecipeFromText(transcript);
+      console.log('🔍 AI extraction result:', recipe);
 
       if (!recipe || !recipe.title) {
         throw new Error(
@@ -145,11 +160,12 @@ const VideoRecipeExtractionWorkflow = ({
         );
       }
 
+      console.log('✨ Recipe successfully extracted:', recipe.title);
       setExtractedRecipe(recipe);
       setIsProcessing(false);
       setStep('preview');
     } catch (err) {
-      console.error('Video extraction error:', err);
+      console.error('❌ Video extraction error:', err);
       throw err;
     }
   };
