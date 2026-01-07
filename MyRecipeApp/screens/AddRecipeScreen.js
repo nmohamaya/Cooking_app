@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRecipes } from '../contexts/RecipeContext';
-import RecipeLinkExtractionModal from '../components/RecipeLinkExtractionModal';
+import VideoRecipeExtractionWorkflow from '../components/VideoRecipeExtractionWorkflow';
 
 const AddRecipeScreen = ({ navigation }) => {
   const { addRecipe } = useRecipes();
@@ -109,7 +109,7 @@ const AddRecipeScreen = ({ navigation }) => {
         <Text style={styles.saveButtonText}>Save Recipe</Text>
       </TouchableOpacity>
 
-      <RecipeLinkExtractionModal
+      <VideoRecipeExtractionWorkflow
         visible={extractionModalVisible}
         onClose={() => setExtractionModalVisible(false)}
         onExtractComplete={handleExtractComplete}
