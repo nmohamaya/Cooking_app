@@ -18,6 +18,14 @@ For detailed documentation on completed meal planning integration, including all
   - GitHub Issue #100 implementation details
 
 ### Quick Reference
+
+**Current Work - Video Transcription Feature (Issue #20)**
+- **PR:** [#124](https://github.com/nmohamaya/Cooking_app/pull/124) - Phases 3 & 4 Implementation
+- **Issue #112:** GitHub Copilot integration for transcription (Phase 3)
+- **Issue #113:** Recipe extraction pipeline (Phase 4)
+- **Status:** ✅ In Review (Ready to merge, all tests passing)
+
+**Previous Work - Meal Planning Integration**
 - **PR:** [#101](https://github.com/nmohamaya/Cooking_app/pull/101) - Meal Plan Integration
 - **Test Issue:** [#102](https://github.com/nmohamaya/Cooking_app/issues/102) - Manual Testing Checklist
 - **Status:** ✅ Complete (532/532 tests passing)
@@ -228,14 +236,21 @@ Parent Issue (#20): Video Transcription Feature
 ├─ Phase 1 (#110): Backend infrastructure
 │  ├─ Branch: feature/issue-20-video-transcription
 │  ├─ PR: #118
-│  └─ Status: ✅ Merged
+│  └─ Status: ✅ Merged (2026-01-06)
 ├─ Phase 2 (#111): Video download & audio extraction
 │  ├─ PR: #119
-│  └─ Status: 🔄 In Review
-├─ Phase 3 (#112): Transcription with AI integration
-│  ├─ PR: #120
-│  └─ Status: ⏳ Pending
-└─ Phase 4-8: Remaining phases...
+│  └─ Status: ✅ Merged (2026-01-06)
+├─ Phase 3 (#112): GitHub Copilot integration for transcription
+│  ├─ PR: #124
+│  ├─ Services: transcriptionService, costTracker, cacheService
+│  ├─ Tests: 49 new tests, all passing
+│  └─ Status: ✅ In Review (Ready to merge, 2026-01-07)
+├─ Phase 4 (#113): Recipe extraction pipeline
+│  ├─ PR: #124 (same PR as Phase 3)
+│  ├─ Services: ingredientService, cookingStepsService, recipeExtractionService
+│  ├─ Tests: 111 new tests, all passing (50%+ coverage)
+│  └─ Status: ✅ In Review (Ready to merge, 2026-01-07)
+└─ Phases 5-8: Remaining UI & integration phases...
 ```
 
 ### Review Comment Handling
