@@ -206,22 +206,30 @@ const VideoRecipeExtractionWorkflow = ({
 
             <VideoRecipeInput
               onVideoSelected={(video) => handleUrlChange(video?.url ?? '')}
+              onExtractStart={() => {
+                setIsProcessing(true);
+                setStep('progress');
+                setProgressStep(1);
+                setError(null);
+              }}
+              onExtractSuccess={async () => {
+                // Trigger the extraction workflow
+                try {
+                  await simulateExtractionWorkflow();
+                } catch (err) {
+                  setError(err.message || 'Failed to extract recipe from video');
+                  setIsProcessing(false);
+                  setStep('input');
+                }
+              }}
+              onExtractError={(errorInfo) => {
+                setError(errorInfo.message || 'Failed to extract recipe');
+                setIsProcessing(false);
+              }}
               isLoading={isProcessing}
               disabled={isProcessing}
               platforms={['YouTube', 'TikTok', 'Instagram', 'Blog']}
             />
-
-            {error && <Text style={styles.errorText}>{error}</Text>}
-
-            <TouchableOpacity
-              style={[styles.nextButton, !isValidUrl && styles.buttonDisabled]}
-              onPress={handleStartExtraction}
-              disabled={!isValidUrl}
-            >
-              <Text style={styles.nextButtonText}>
-                {isProcessing ? 'Processing...' : 'Extract Recipe'}
-              </Text>
-            </TouchableOpacity>
 
             <View style={styles.supportedPlatforms}>
               <Text style={styles.platformsTitle}>Supported Platforms:</Text>
