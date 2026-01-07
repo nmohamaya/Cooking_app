@@ -89,7 +89,7 @@ const RecipePreviewModal = ({
     try {
       await onSave(editedRecipe);
       setEditMode(false);
-      Alert.alert('Success', 'Recipe saved successfully');
+      // Success feedback handled by parent component
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to save recipe');
     } finally {
@@ -479,7 +479,10 @@ const styles = StyleSheet.create({
   },
   sourceOverlay: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -505,11 +508,12 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   ingredientList: {
-    gap: 8,
+    marginBottom: 8,
   },
   ingredientItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
   },
   ingredientIcon: {
     marginRight: 8,
@@ -520,11 +524,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   instructionList: {
-    gap: 12,
+    marginBottom: 12,
   },
   instructionItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    marginBottom: 12,
   },
   stepNumber: {
     width: 28,
@@ -558,7 +563,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    gap: 8,
   },
   button: {
     flex: 1,
@@ -569,7 +573,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     borderWidth: 1,
-    gap: 6,
+    marginHorizontal: 3,
   },
   useButton: {
     backgroundColor: '#4CAF50',
