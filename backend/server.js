@@ -1,13 +1,16 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const logger = require('./config/logger');
+const config = require('./config/env');
 
 // Initialize Express app
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: config.corsOrigin }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -45,7 +48,7 @@ app.use((req, res) => {
 });
 
 // Error handler
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   logger.error('Unhandled error:', err);
   
   const status = err.status || 500;
@@ -60,31 +63,42 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Server startup
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || 'localhost';
+// Start server only when run directly, not when imported for tests
+let server;
 
-const server = app.listen(PORT, HOST, () => {
-  logger.info(`🚀 Server running at http://${HOST}:${PORT}`);
-  logger.info(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`✓ Health check: http://${HOST}:${PORT}/health`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    logger.info('HTTP server closed');
-    process.exit(0);
+if (require.main === module) {
+  server = app.listen(config.port, config.host, () => {
+    logger.info(`🚀 Server running at http://${config.host}:${config.port}`);
+    logger.info(`📡 Environment: ${config.nodeEnv}`);
+    logger.info(`✓ Health check: http://${config.host}:${config.port}/health`);
   });
-});
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT signal received: closing HTTP server');
-  server.close(() => {
-    logger.info('HTTP server closed');
-    process.exit(0);
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM signal received: closing HTTP server');
+    server.close((err) => {
+      if (err) {
+        logger.error('Error closing HTTP server:', err);
+        process.exit(1);
+      } else {
+        logger.info('HTTP server closed');
+        process.exit(0);
+      }
+    });
   });
-});
+
+  process.on('SIGINT', () => {
+    logger.info('SIGINT signal received: closing HTTP server');
+    server.close((err) => {
+      if (err) {
+        logger.error('Error closing HTTP server:', err);
+        process.exit(1);
+      } else {
+        logger.info('HTTP server closed');
+        process.exit(0);
+      }
+    });
+  });
+}
 
 module.exports = app;

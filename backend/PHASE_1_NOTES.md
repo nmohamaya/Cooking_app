@@ -34,7 +34,7 @@
 5. **Testing Framework** (`jest.config.js`, `tests/`)
    - Jest configured for Node.js
    - Supertest for API testing
-   - 60% coverage threshold
+   - Coverage thresholds: 20% branches/functions, 30% lines/statements
    - Server tests covering health, version, errors, CORS
 
 6. **Package Configuration** (`package.json`)
@@ -64,7 +64,7 @@ backend/
     └── setup.js           (2 lines)
 ```
 
-Total: 12 files, ~521 lines of code
+Total: 13 files, ~521 lines of code
 
 ### Dependencies Added
 
