@@ -12,7 +12,7 @@
  * dependencies. These tests focus on the core logic validation.
  */
 
-const urlValidator = require('../../utils/urlValidator');
+const urlValidator = require('../../utils/urlValidator').default;
 
 describe('VideoRecipeInput Logic', () => {
   describe('URL Validation', () => {

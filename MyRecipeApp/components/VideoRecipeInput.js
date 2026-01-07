@@ -11,7 +11,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { urlValidator } from '../utils/urlValidator';
+import urlValidator from '../utils/urlValidator';
 
 const VideoRecipeInput = ({
   onExtractStart = () => {},
