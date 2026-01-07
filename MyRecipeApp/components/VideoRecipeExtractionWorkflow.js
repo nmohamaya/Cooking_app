@@ -11,6 +11,10 @@ import VideoRecipeInput from './VideoRecipeInput';
 import TranscriptionProgress from './TranscriptionProgress';
 import RecipePreviewModal from './RecipePreviewModal';
 import urlValidator from '../utils/urlValidator';
+import { getYoutubeTranscript } from '../services/youtubeExtractorService';
+import { getTikTokContent } from '../services/socialMediaExtractorService';
+import { getInstagramContent } from '../services/socialMediaExtractorService';
+import { extractRecipeFromText } from '../services/recipeExtraction';
 
 /**
  * VideoRecipeExtractionWorkflow Component
@@ -68,8 +72,8 @@ const VideoRecipeExtractionWorkflow = ({
     setError(null);
 
     try {
-      // Simulate extraction workflow with progress updates
-      await simulateExtractionWorkflow();
+      // Real extraction workflow
+      await extractRecipeFromVideo();
     } catch (err) {
       setError(err.message || 'Failed to extract recipe from video');
       setIsProcessing(false);
@@ -77,49 +81,77 @@ const VideoRecipeExtractionWorkflow = ({
     }
   };
 
-  const simulateExtractionWorkflow = async () => {
-    // Step 1: Download video
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setProgressStep(2);
+  const extractRecipeFromVideo = async () => {
+    try {
+      // Step 1: Get video transcript based on URL platform
+      setProgressStep(1);
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Step 2: Extract audio
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setProgressStep(3);
+      const provider = urlValidator.getVideoProvider(url);
+      const videoId = urlValidator.extractVideoId(url);
 
-    // Step 3: Process with AI
-    await new Promise(resolve => setTimeout(resolve, 2000));
+      if (!videoId) {
+        throw new Error(`Could not extract video ID from ${provider} URL`);
+      }
 
-    // Mock extracted recipe (in real implementation, this would come from backend)
-    const mockRecipe = {
-      title: 'Pasta Carbonara',
-      duration: '20 minutes',
-      difficulty: 'Medium',
-      provider: url,
-      thumbnail: null,
-      ingredients: [
-        '400g pasta (spaghetti or linguine)',
-        '200g pancetta or guanciale, diced',
-        '4 large eggs',
-        '100g Pecorino Romano cheese, grated',
-        'Black pepper',
-        'Salt',
-      ],
-      instructions: [
-        'Bring a large pot of salted water to boil. Cook pasta until al dente.',
-        'While pasta cooks, cut pancetta into small cubes and cook in a large pan until crispy.',
-        'In a bowl, whisk together eggs and grated Pecorino Romano cheese.',
-        'Reserve 1 cup of pasta water before draining.',
-        'Remove pancetta from heat and add hot pasta to the pan.',
-        'Quickly pour egg mixture over pasta while stirring constantly.',
-        'Add pasta water gradually to create a creamy sauce.',
-        'Season with black pepper and serve immediately.',
-      ],
-      notes: 'Do not overcook eggs - the residual heat cooks them into a creamy sauce',
-    };
+      let transcript = null;
 
-    setExtractedRecipe(mockRecipe);
-    setIsProcessing(false);
-    setStep('preview');
+      // Fetch transcript based on platform
+      if (provider === 'youtube') {
+        const result = await getYoutubeTranscript(videoId, 'en');
+        if (!result.success) {
+          throw new Error(`YouTube: ${result.error || 'Could not retrieve video transcript'}`);
+        }
+        transcript = result.transcript;
+      } else if (provider === 'tiktok') {
+        const result = await getTikTokContent(videoId);
+        if (!result.success) {
+          throw new Error(`TikTok: ${result.error || 'Could not retrieve video content'}`);
+        }
+        transcript = result.content;
+      } else if (provider === 'instagram') {
+        const result = await getInstagramContent(videoId);
+        if (!result.success) {
+          throw new Error(`Instagram: ${result.error || 'Could not retrieve post content'}`);
+        }
+        transcript = result.content;
+      } else if (provider === 'twitter' || provider === 'facebook') {
+        throw new Error(`${provider} extraction is not yet supported. Currently supporting: YouTube, TikTok, Instagram`);
+      } else {
+        throw new Error(`Unsupported platform: ${provider}`);
+      }
+
+      if (!transcript || transcript.trim().length === 0) {
+        throw new Error(
+          `No transcript or description found for this ${provider} video. ` +
+          `The video may not have captions/description available. ` +
+          `Please try another video with captions enabled.`
+        );
+      }
+
+      // Step 2: Extract audio (simulated - shows progress)
+      setProgressStep(2);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Step 3: Process with AI
+      setProgressStep(3);
+      const recipe = await extractRecipeFromText(transcript);
+
+      if (!recipe || !recipe.title) {
+        throw new Error(
+          'The AI could not identify a recipe in this video. ' +
+          'Please ensure the video contains clear cooking instructions. ' +
+          'Try a different video that focuses on recipe preparation.'
+        );
+      }
+
+      setExtractedRecipe(recipe);
+      setIsProcessing(false);
+      setStep('preview');
+    } catch (err) {
+      console.error('Video extraction error:', err);
+      throw err;
+    }
   };
 
   const handleRecipeUse = (recipe) => {
