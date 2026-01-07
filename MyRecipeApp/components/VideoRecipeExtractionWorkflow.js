@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import VideoRecipeInput from './VideoRecipeInput';
 import TranscriptionProgress from './TranscriptionProgress';
@@ -46,7 +45,7 @@ const VideoRecipeExtractionWorkflow = ({
   const handleUrlChange = (newUrl) => {
     setUrl(newUrl);
     // Validate URL with urlValidator utility
-    const isValid = urlValidator.validateUrl(newUrl);
+    const isValid = urlValidator.isValidVideoUrl(newUrl);
     setIsValidUrl(isValid);
     setError(null);
   };
@@ -206,9 +205,10 @@ const VideoRecipeExtractionWorkflow = ({
             </Text>
 
             <VideoRecipeInput
-              url={url}
-              onUrlChange={handleUrlChange}
-              isValid={isValidUrl}
+              onVideoSelected={(video) => handleUrlChange(video?.url ?? '')}
+              isLoading={isProcessing}
+              disabled={isProcessing}
+              platforms={['YouTube', 'TikTok', 'Instagram', 'Blog']}
             />
 
             {error && <Text style={styles.errorText}>{error}</Text>}
