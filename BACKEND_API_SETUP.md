@@ -1,4 +1,4 @@
-# Backend API Setup & Route Activation (Issue #117)
+# Backend API Setup & Route Activation (Issue #130)
 
 ## Overview
 This document outlines the backend API setup for the video recipe extraction system. All routes have been activated and the server is ready for real recipe extraction from social media platforms and websites.
@@ -448,5 +448,5 @@ Results are cached to reduce API calls:
 ---
 
 *Last Updated: 2026-01-07*
-*Issue: #117 - Backend API Setup & Route Activation*
+*Issue: #130 - Backend API Setup & Route Activation*
 *Status: ✅ COMPLETE*
