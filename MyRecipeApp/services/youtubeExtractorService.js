@@ -1,10 +1,11 @@
 /**
- * YouTube Transcript Extraction Service
+ * YouTube Transcript Extraction Service - API Integrated
  * Fetches and caches YouTube transcripts/captions for recipe videos
- * Supports multiple languages with fallback to auto-generated captions
+ * Integrates with backend API for transcript extraction and recipe parsing
  */
 
 import { AsyncStorage } from 'react-native';
+import apiClient from './apiClient';
 
 /**
  * Cache configuration
@@ -366,4 +367,152 @@ export const analyzeTranscriptError = (error) => {
     shouldThrow: true,
     message: 'Failed to fetch transcript. Please try again.',
   };
+};
+
+// ============= API Integration Functions =============
+
+/**
+ * Extract recipe from YouTube video using backend API
+ * @param {string} youtubeUrl - YouTube video URL
+ * @returns {Promise<Object>} - {success, recipe, confidence, error}
+ */
+export const extractRecipeFromYoutube = async (youtubeUrl) => {
+  if (!youtubeUrl || typeof youtubeUrl !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid YouTube URL',
+    };
+  }
+
+  try {
+    // Step 1: Download video
+    const downloadResult = await apiClient.downloadVideo(youtubeUrl, {
+      platform: 'youtube',
+    });
+
+    if (!downloadResult.success) {
+      return {
+        success: false,
+        error: downloadResult.message || 'Failed to download video',
+      };
+    }
+
+    // Step 2: Transcribe audio
+    const transcriptResult = await apiClient.transcribeAudio(
+      downloadResult.videoPath || youtubeUrl,
+      { language: 'auto' }
+    );
+
+    if (!transcriptResult.success) {
+      return {
+        success: false,
+        error: transcriptResult.message || 'Failed to transcribe',
+      };
+    }
+
+    // Step 3: Extract recipe
+    const recipeResult = await apiClient.extractRecipe(
+      transcriptResult.transcript,
+      { aiModel: 'gpt-3.5-turbo' }
+    );
+
+    if (!recipeResult.success) {
+      return {
+        success: false,
+        error: recipeResult.message || 'Failed to extract recipe',
+      };
+    }
+
+    return {
+      success: true,
+      recipe: recipeResult.recipe,
+      confidence: recipeResult.confidence,
+      transcript: transcriptResult.transcript,
+      language: transcriptResult.language,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to extract recipe from YouTube',
+    };
+  }
+};
+
+/**
+ * Download YouTube video via backend API
+ * @param {string} youtubeUrl - YouTube video URL
+ * @param {Object} options - Download options {quality}
+ * @returns {Promise<Object>} - {success, jobId, progress, error}
+ */
+export const downloadYoutubeVideo = async (youtubeUrl, options = {}) => {
+  if (!youtubeUrl || typeof youtubeUrl !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid YouTube URL',
+    };
+  }
+
+  try {
+    const { quality = 'high' } = options;
+
+    const result = await apiClient.downloadVideo(youtubeUrl, {
+      platform: 'youtube',
+      quality,
+    });
+
+    return result.success
+      ? {
+          success: true,
+          jobId: result.jobId,
+          progress: result.progress,
+          videoPath: result.videoPath,
+        }
+      : {
+          success: false,
+          error: result.message || 'Download failed',
+        };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to download YouTube video',
+    };
+  }
+};
+
+/**
+ * Get transcript using backend transcription API
+ * @param {string} youtubeUrl - YouTube video URL or path to audio
+ * @param {Object} options - Options {language}
+ * @returns {Promise<Object>} - {success, transcript, language, error}
+ */
+export const getTranscriptViaApi = async (youtubeUrl, options = {}) => {
+  if (!youtubeUrl) {
+    return {
+      success: false,
+      error: 'Invalid input',
+    };
+  }
+
+  try {
+    const { language = 'auto' } = options;
+
+    const result = await apiClient.transcribeAudio(youtubeUrl, { language });
+
+    return result.success
+      ? {
+          success: true,
+          transcript: result.transcript,
+          language: result.language,
+          confidence: result.confidence,
+        }
+      : {
+          success: false,
+          error: result.message || 'Transcription failed',
+        };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to get transcript',
+    };
+  }
 };
