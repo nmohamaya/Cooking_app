@@ -5,6 +5,7 @@
  */
 
 import { AsyncStorage } from 'react-native';
+import apiClient from './apiClient';
 
 /**
  * Cache configuration
@@ -499,4 +500,105 @@ export const analyzeTikTokError = (error) => {
     message: message,
     recoverable: true,
   };
+};
+
+/**
+ * Download TikTok video via API
+ * Uses centralized API client service for real backend integration
+ * @param {string} tiktokUrl - TikTok video URL
+ * @param {Object} options - Download options (optional)
+ * @returns {Promise<Object>} - {success, jobId, url, error}
+ */
+export const downloadTikTokVideoViaApi = async (tiktokUrl, options = {}) => {
+  if (!tiktokUrl || typeof tiktokUrl !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid TikTok URL',
+    };
+  }
+
+  try {
+    const result = await apiClient.downloadVideo(tiktokUrl, {
+      platform: 'tiktok',
+      ...options,
+    });
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to download TikTok video',
+      details: error,
+    };
+  }
+};
+
+/**
+ * Get transcription of TikTok video via API
+ * Uses centralized API client for audio transcription
+ * @param {string} tiktokUrl - TikTok video URL
+ * @param {Object} options - Transcription options (optional)
+ * @returns {Promise<Object>} - {success, transcript, videoId, error}
+ */
+export const getTranscriptViaApi = async (tiktokUrl, options = {}) => {
+  if (!tiktokUrl || typeof tiktokUrl !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid TikTok URL',
+    };
+  }
+
+  try {
+    const result = await apiClient.transcribeAudio(tiktokUrl, {
+      platform: 'tiktok',
+      ...options,
+    });
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to transcribe TikTok video',
+      details: error,
+    };
+  }
+};
+
+/**
+ * Extract recipe from TikTok video via API
+ * Complete workflow: download → transcribe → extract
+ * @param {string} tiktokUrl - TikTok video URL
+ * @param {Object} options - Extraction options (optional)
+ * @returns {Promise<Object>} - {success, recipe, videoId, error}
+ */
+export const extractRecipeFromTikTokViaApi = async (tiktokUrl, options = {}) => {
+  if (!tiktokUrl || typeof tiktokUrl !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid TikTok URL',
+    };
+  }
+
+  try {
+    // Validate URL first
+    const urlValidation = validateTikTokUrl(tiktokUrl);
+    if (!urlValidation.valid) {
+      return {
+        success: false,
+        error: urlValidation.error,
+      };
+    }
+
+    // Use API client to extract recipe
+    const result = await apiClient.extractRecipe(tiktokUrl, {
+      platform: 'tiktok',
+      ...options,
+    });
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to extract recipe from TikTok video',
+      details: error,
+    };
+  }
 };

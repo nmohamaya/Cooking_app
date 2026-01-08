@@ -5,6 +5,7 @@
  */
 
 import { AsyncStorage } from 'react-native';
+import apiClient from './apiClient';
 
 /**
  * Cache configuration
@@ -693,4 +694,96 @@ export const validateRecipeData = (recipe) => {
     valid: errors.length === 0,
     errors,
   };
+};
+
+/**
+ * Get website metadata via API
+ * Uses centralized API client for metadata fetching
+ * @param {string} websiteUrl - Website URL
+ * @param {Object} options - Metadata options (optional)
+ * @returns {Promise<Object>} - {success, metadata, url, error}
+ */
+export const getWebsiteMetadataViaApi = async (websiteUrl, options = {}) => {
+  if (!websiteUrl || typeof websiteUrl !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid website URL',
+    };
+  }
+
+  try {
+    const result = await apiClient.getVideoMetadata(websiteUrl, {
+      platform: 'website',
+      ...options,
+    });
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch website metadata',
+      details: error,
+    };
+  }
+};
+
+/**
+ * Extract recipe from website via API
+ * Uses centralized API client for recipe extraction
+ * @param {string} websiteUrl - Website URL
+ * @param {Object} options - Extraction options (optional)
+ * @returns {Promise<Object>} - {success, recipe, url, error}
+ */
+export const extractRecipeFromWebsiteViaApi = async (websiteUrl, options = {}) => {
+  if (!websiteUrl || typeof websiteUrl !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid website URL',
+    };
+  }
+
+  try {
+    // Validate URL first
+    const urlValidation = validateWebsiteUrl(websiteUrl);
+    if (!urlValidation.valid) {
+      return {
+        success: false,
+        error: urlValidation.error,
+      };
+    }
+
+    // Use API client to extract recipe
+    const result = await apiClient.extractRecipe(websiteUrl, {
+      platform: 'website',
+      ...options,
+    });
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to extract recipe from website',
+      details: error,
+    };
+  }
+};
+
+/**
+ * Get platform capabilities via API
+ * Determine what platforms the backend supports
+ * @returns {Promise<Object>} - {success, platforms, error}
+ */
+export const getAvailablePlatformsViaApi = async () => {
+  try {
+    const platforms = await apiClient.getAvailablePlatforms();
+    return {
+      success: true,
+      platforms: platforms || [],
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to get available platforms',
+      details: error,
+    };
+  }
 };

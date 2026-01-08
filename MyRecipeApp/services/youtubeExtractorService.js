@@ -16,6 +16,66 @@ const CACHE_CONFIG = {
 };
 
 /**
+ * YouTube URL patterns
+ */
+const YOUTUBE_PATTERNS = {
+  standard: /^https?:\/\/(www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
+  short: /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})/,
+  embed: /^https?:\/\/(www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+};
+
+/**
+ * Validate YouTube URL and extract video ID
+ * @param {string} url - YouTube URL
+ * @returns {Object} - {valid, videoId, urlType, error}
+ */
+export const validateYoutubeUrl = (url) => {
+  if (!url || typeof url !== 'string') {
+    return {
+      valid: false,
+      error: 'Invalid URL format',
+    };
+  }
+
+  const trimmedUrl = url.trim();
+
+  // Try standard pattern
+  const standardMatch = trimmedUrl.match(YOUTUBE_PATTERNS.standard);
+  if (standardMatch) {
+    return {
+      valid: true,
+      videoId: standardMatch[2],
+      urlType: 'standard',
+    };
+  }
+
+  // Try short form pattern
+  const shortMatch = trimmedUrl.match(YOUTUBE_PATTERNS.short);
+  if (shortMatch) {
+    return {
+      valid: true,
+      videoId: shortMatch[1],
+      urlType: 'short',
+    };
+  }
+
+  // Try embed pattern
+  const embedMatch = trimmedUrl.match(YOUTUBE_PATTERNS.embed);
+  if (embedMatch) {
+    return {
+      valid: true,
+      videoId: embedMatch[2],
+      urlType: 'embed',
+    };
+  }
+
+  return {
+    valid: false,
+    error: 'Invalid YouTube URL format',
+  };
+};
+
+/**
  * Get YouTube transcript for a video
  * @param {string} videoId - YouTube video ID
  * @param {string} language - Language code (default: 'en')
