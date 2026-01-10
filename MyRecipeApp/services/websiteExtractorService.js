@@ -23,10 +23,10 @@ const WEBSITE_PATTERNS = {
   allRecipes: /^https?:\/\/(www\.)?allrecipes\.com\/recipe\/\d+\//,
   foodNetwork: /^https?:\/\/(www\.)?foodnetwork\.com\/recipes\/\d+\//,
   epicurious: /^https?:\/\/(www\.)?epicurious\.com\/recipes\/food\/views\/[^\/]+\//,
-  simplyRecipes: /^https?:\/\/(www\.)?simplyrecipes\.com\/recipes\/[^\/]+\//,
+  simplyRecipes: /^https?:\/\/(www\.)?simplyrecipes\.com\/recipes\/[^\/]+/,
   kingArthur: /^https?:\/\/(www\.)?kingarthurbaking\.com\/recipes\/[^\/]+\//,
-  bonAppetit: /^https?:\/\/(www\.)?bonappetitmag\.com\/recipe\/[^\/]+\//,
-  serious: /^https?:\/\/(www\.)?seriouseats\.com\/recipes\/[^\/]+\//,
+  bonAppetit: /^https?:\/\/(www\.)?bonappetitmag\.com\/recipe\/[^\/]+/,
+  serious: /^https?:\/\/(www\.)?seriouseats\.com\/recipes\/[^\/]+/,
   generic: /^https?:\/\/[a-zA-Z0-9\-._~:/?#\[\]@!$&'()*+,;=]+/,
 };
 
