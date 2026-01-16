@@ -11,10 +11,10 @@ import VideoRecipeInput from './VideoRecipeInput';
 import TranscriptionProgress from './TranscriptionProgress';
 import RecipePreviewModal from './RecipePreviewModal';
 import urlValidator from '../utils/urlValidator';
-import { extractRecipeFromYoutube } from '../services/youtubeExtractorService';
-import { extractRecipeFromTikTokViaApi } from '../services/tiktokExtractorService';
-import { extractRecipeFromInstagramViaApi } from '../services/instagramExtractorService';
-import { extractRecipeFromWebsiteViaApi } from '../services/websiteExtractorService';
+import { getYoutubeTranscript } from '../services/youtubeExtractorService';
+import { getTikTokContent } from '../services/socialMediaExtractorService';
+import { getInstagramContent } from '../services/socialMediaExtractorService';
+import { extractRecipeFromText } from '../services/recipeExtraction';
 
 /**
  * VideoRecipeExtractionWorkflow Component
@@ -72,82 +72,119 @@ const VideoRecipeExtractionWorkflow = ({
     setError(null);
 
     try {
-      // Simulate extraction workflow with progress updates
-      await simulateExtractionWorkflow();
+      // Real extraction workflow
+      await extractRecipeFromVideo();
     } catch (err) {
-      setError(err.message || 'Failed to extract recipe from video');
+      const errorMessage = err.message || 'Failed to extract recipe from video';
+      console.error('🚨 Extraction failed with error:', errorMessage);
+      setError(errorMessage);
       setIsProcessing(false);
       setStep('input');
     }
   };
 
-  const simulateExtractionWorkflow = async () => {
+  const extractRecipeFromVideo = async () => {
     try {
-      // Determine platform from URL
-      let platformFunction = null;
-      let platform = 'unknown';
-
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        platform = 'youtube';
-        platformFunction = extractRecipeFromYoutube;
-      } else if (url.includes('tiktok.com') || url.includes('vm.tiktok') || url.includes('vt.tiktok')) {
-        platform = 'tiktok';
-        platformFunction = extractRecipeFromTikTokViaApi;
-      } else if (url.includes('instagram.com') || url.includes('ig.me')) {
-        platform = 'instagram';
-        platformFunction = extractRecipeFromInstagramViaApi;
-      } else {
-        // Assume it's a website/blog
-        platform = 'website';
-        platformFunction = extractRecipeFromWebsiteViaApi;
-      }
-
-      // Step 1: Download/fetch video
+      // Step 1: Get video transcript based on URL platform
+      console.log('🎬 Starting video extraction for URL:', url);
       setProgressStep(1);
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Step 2: Extract audio/content
+      const provider = urlValidator.getVideoProvider(url);
+      const videoId = urlValidator.extractVideoId(url);
+
+      console.log('📺 Detected provider:', provider, 'Video ID:', videoId);
+
+      if (!videoId) {
+        throw new Error(`Could not extract video ID from ${provider} URL`);
+      }
+
+      let transcript = null;
+
+      // Fetch transcript based on platform
+      if (provider === 'youtube') {
+        console.log('📥 Fetching YouTube transcript...');
+        const result = await getYoutubeTranscript(videoId, 'en');
+        console.log('YouTube result:', result);
+        if (!result.success) {
+          throw new Error(`YouTube: ${result.error || 'Could not retrieve video transcript'}`);
+        }
+        transcript = result.transcript;
+      } else if (provider === 'tiktok') {
+        console.log('📥 Fetching TikTok content...');
+        const result = await getTikTokContent(videoId);
+        console.log('TikTok result:', result);
+        if (!result.success) {
+          throw new Error(`TikTok: ${result.error || 'Could not retrieve video content'}`);
+        }
+        transcript = result.content;
+      } else if (provider === 'instagram') {
+        console.log('📥 Fetching Instagram content...');
+        const result = await getInstagramContent(videoId);
+        console.log('Instagram result:', result);
+        if (!result.success) {
+          throw new Error(`Instagram: ${result.error || 'Could not retrieve post content'}`);
+        }
+        transcript = result.content;
+      } else if (provider === 'twitter' || provider === 'facebook') {
+        throw new Error(`${provider} extraction is not yet supported. Currently supporting: YouTube, TikTok, Instagram`);
+      } else {
+        throw new Error(`Unsupported platform: ${provider}`);
+      }
+
+      if (!transcript || transcript.trim().length === 0) {
+        throw new Error(
+          `No transcript or description found for this ${provider} video. ` +
+          `The video may not have captions/description available. ` +
+          `Please try another video with captions enabled.`
+        );
+      }
+
+      console.log('✅ Transcript obtained, length:', transcript.length, 'chars');
+
+      // Step 2: Extract audio (simulated - shows progress)
       setProgressStep(2);
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Step 3: Process with AI (actual API call)
+      // Step 3: Process with AI
       setProgressStep(3);
+      console.log('🤖 Sending transcript to AI for recipe extraction...');
+      
+      // Check if GitHub token is configured
+      if (!process.env.EXPO_PUBLIC_GITHUB_TOKEN && typeof window !== 'undefined') {
+        // Browser environment without token
+        throw new Error(
+          'GitHub token not configured! 🔐\n\n' +
+          'Recipe extraction requires a GitHub token for AI access.\n\n' +
+          'Setup Instructions:\n' +
+          '1. Go to: https://github.com/settings/tokens\n' +
+          '2. Click "Generate new token (classic)"\n' +
+          '3. Select scopes: repo, read:packages\n' +
+          '4. Create file ".env" in MyRecipeApp folder\n' +
+          '5. Add: GITHUB_TOKEN=your_token_here\n' +
+          '6. Restart the app (npm start)\n\n' +
+          'GitHub Models offers FREE access to GPT-4o!'
+        );
+      }
+      
+      const recipe = await extractRecipeFromText(transcript);
+      console.log('🔍 AI extraction result:', recipe);
 
-      // Call the appropriate extraction function based on platform
-      const result = await platformFunction(url, {
-        timeout: 60000,
-        retryAttempts: 3,
-      });
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to extract recipe');
+      if (!recipe || !recipe.title) {
+        throw new Error(
+          'The AI could not identify a recipe in this video. ' +
+          'Please ensure the video contains clear cooking instructions. ' +
+          'Try a different video that focuses on recipe preparation.'
+        );
       }
 
-      // Format the recipe from API response
-      const recipe = result.recipe || {
-        title: 'Extracted Recipe',
-        ingredients: [],
-        instructions: [],
-      };
-
-      setExtractedRecipe({
-        title: recipe.title || 'Extracted Recipe',
-        duration: recipe.duration || 'N/A',
-        difficulty: recipe.difficulty || 'Medium',
-        provider: url,
-        thumbnail: recipe.thumbnail || null,
-        ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [recipe.ingredients || ''],
-        instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [recipe.instructions || ''],
-        notes: recipe.notes || '',
-      });
-
+      console.log('✨ Recipe successfully extracted:', recipe.title);
+      setExtractedRecipe(recipe);
       setIsProcessing(false);
       setStep('preview');
     } catch (err) {
-      console.error(`Failed to extract recipe from ${url}:`, err);
-      setError(err.message || 'Failed to extract recipe from video');
-      setIsProcessing(false);
-      setStep('input');
+      console.error('❌ Video extraction error:', err);
+      throw err;
     }
   };
 
@@ -235,22 +272,30 @@ const VideoRecipeExtractionWorkflow = ({
 
             <VideoRecipeInput
               onVideoSelected={(video) => handleUrlChange(video?.url ?? '')}
+              onExtractStart={() => {
+                setIsProcessing(true);
+                setStep('progress');
+                setProgressStep(1);
+                setError(null);
+              }}
+              onExtractSuccess={async () => {
+                // Trigger the extraction workflow
+                try {
+                  await simulateExtractionWorkflow();
+                } catch (err) {
+                  setError(err.message || 'Failed to extract recipe from video');
+                  setIsProcessing(false);
+                  setStep('input');
+                }
+              }}
+              onExtractError={(errorInfo) => {
+                setError(errorInfo.message || 'Failed to extract recipe');
+                setIsProcessing(false);
+              }}
               isLoading={isProcessing}
               disabled={isProcessing}
               platforms={['YouTube', 'TikTok', 'Instagram', 'Blog']}
             />
-
-            {error && <Text style={styles.errorText}>{error}</Text>}
-
-            <TouchableOpacity
-              style={[styles.nextButton, !isValidUrl && styles.buttonDisabled]}
-              onPress={handleStartExtraction}
-              disabled={!isValidUrl}
-            >
-              <Text style={styles.nextButtonText}>
-                {isProcessing ? 'Processing...' : 'Extract Recipe'}
-              </Text>
-            </TouchableOpacity>
 
             <View style={styles.supportedPlatforms}>
               <Text style={styles.platformsTitle}>Supported Platforms:</Text>
