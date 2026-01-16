@@ -5,6 +5,7 @@
  */
 
 import { AsyncStorage } from 'react-native';
+import apiClient from './apiClient';
 
 /**
  * Cache configuration
@@ -658,4 +659,105 @@ export const analyzeInstagramError = (error) => {
     message: message,
     recoverable: true,
   };
+};
+
+/**
+ * Download Instagram video via API
+ * Uses centralized API client service for real backend integration
+ * @param {string} instagramUrl - Instagram video URL
+ * @param {Object} options - Download options (optional)
+ * @returns {Promise<Object>} - {success, jobId, url, error}
+ */
+export const downloadInstagramVideoViaApi = async (instagramUrl, options = {}) => {
+  if (!instagramUrl || typeof instagramUrl !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid Instagram URL',
+    };
+  }
+
+  try {
+    const result = await apiClient.downloadVideo(instagramUrl, {
+      platform: 'instagram',
+      ...options,
+    });
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to download Instagram video',
+      details: error,
+    };
+  }
+};
+
+/**
+ * Get transcription of Instagram video via API
+ * Uses centralized API client for audio transcription
+ * @param {string} instagramUrl - Instagram video URL
+ * @param {Object} options - Transcription options (optional)
+ * @returns {Promise<Object>} - {success, transcript, url, error}
+ */
+export const getTranscriptViaApi = async (instagramUrl, options = {}) => {
+  if (!instagramUrl || typeof instagramUrl !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid Instagram URL',
+    };
+  }
+
+  try {
+    const result = await apiClient.transcribeAudio(instagramUrl, {
+      platform: 'instagram',
+      ...options,
+    });
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to transcribe Instagram video',
+      details: error,
+    };
+  }
+};
+
+/**
+ * Extract recipe from Instagram video via API
+ * Complete workflow: download → transcribe → extract
+ * @param {string} instagramUrl - Instagram video URL
+ * @param {Object} options - Extraction options (optional)
+ * @returns {Promise<Object>} - {success, recipe, url, error}
+ */
+export const extractRecipeFromInstagramViaApi = async (instagramUrl, options = {}) => {
+  if (!instagramUrl || typeof instagramUrl !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid Instagram URL',
+    };
+  }
+
+  try {
+    // Validate URL first
+    const urlValidation = validateInstagramUrl(instagramUrl);
+    if (!urlValidation.valid) {
+      return {
+        success: false,
+        error: urlValidation.error,
+      };
+    }
+
+    // Use API client to extract recipe
+    const result = await apiClient.extractRecipe(instagramUrl, {
+      platform: 'instagram',
+      ...options,
+    });
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to extract recipe from Instagram video',
+      details: error,
+    };
+  }
 };

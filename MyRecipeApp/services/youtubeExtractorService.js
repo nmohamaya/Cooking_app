@@ -451,3 +451,104 @@ export const analyzeTranscriptError = (error) => {
     message: 'Failed to fetch transcript. Please try again.',
   };
 };
+
+/**
+ * Download YouTube video via API
+ * @param {string} url - YouTube URL
+ * @returns {Promise<Object>} - {success, videoPath, metadata, error}
+ */
+export const downloadYoutubeVideo = async (url) => {
+  try {
+    if (!url || typeof url !== 'string') {
+      return {
+        success: false,
+        error: 'Invalid URL',
+      };
+    }
+
+    const downloadResponse = await axios.post(
+      `${BACKEND_CONFIG.BASE_URL}/api/download`,
+      { 
+        url,
+        platform: 'youtube'
+      },
+      { timeout: BACKEND_CONFIG.TIMEOUT_MS }
+    );
+
+    return {
+      success: downloadResponse.data.success,
+      videoPath: downloadResponse.data.videoPath,
+      metadata: downloadResponse.data.metadata,
+      error: downloadResponse.data.error,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to download video',
+    };
+  }
+};
+
+/**
+ * Get YouTube transcript via API (alias for getYoutubeTranscript)
+ * @param {string} videoId - YouTube video ID
+ * @returns {Promise<Object>} - {success, transcript, error}
+ */
+export const getTranscriptViaApi = async (videoId) => {
+  return getYoutubeTranscript(videoId, 'en');
+};
+
+/**
+ * Extract recipe from YouTube video
+ * @param {string} url - YouTube URL
+ * @param {Object} options - Options (timeout, etc.)
+ * @returns {Promise<Object>} - {success, recipe, transcript, error}
+ */
+export const extractRecipeFromYoutube = async (url, options = {}) => {
+  try {
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+      return {
+        success: false,
+        error: 'Invalid YouTube URL',
+      };
+    }
+
+    // Extract video ID from URL
+    const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (!videoIdMatch || !videoIdMatch[1]) {
+      return {
+        success: false,
+        error: 'Invalid YouTube URL format',
+      };
+    }
+
+    const videoId = videoIdMatch[1];
+
+    // Get transcript
+    const transcriptResult = await getYoutubeTranscript(videoId);
+    if (!transcriptResult.success) {
+      return {
+        success: false,
+        error: transcriptResult.error,
+      };
+    }
+
+    // For now, return the transcript as the recipe
+    // In a real app, this would parse the transcript to extract recipe details
+    return {
+      success: true,
+      recipe: {
+        title: `Recipe from YouTube Video ${videoId}`,
+        transcript: transcriptResult.transcript,
+        sourceUrl: url,
+        extractedAt: new Date().toISOString(),
+      },
+      transcript: transcriptResult.transcript,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to extract recipe from YouTube',
+    };
+  }
+};
