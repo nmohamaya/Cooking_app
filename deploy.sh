@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 DEPLOYMENT_ENV=${1:-production}
-PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 BACKEND_DIR="$PROJECT_ROOT/backend"
 
 echo -e "${GREEN}========================================${NC}"
@@ -84,13 +84,26 @@ REQUIRED_VARS=("NODE_ENV" "PORT" "HOST" "GITHUB_TOKEN")
 MISSING_VARS=()
 
 for var in "${REQUIRED_VARS[@]}"; do
-  if ! grep -q "^$var=" .env.production; then
+  # Get the last definition of the variable (if any)
+  line=$(grep "^$var=" .env.production | tail -n 1 || true)
+
+  if [ -z "$line" ]; then
+    # Variable not defined at all
+    MISSING_VARS+=("$var")
+    continue
+  fi
+
+  # Strip "VAR=" prefix and check if value is empty or whitespace-only
+  value=$(printf '%s\n' "$line" | sed -e "s/^$var=//" -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+  if [ -z "$value" ]; then
+    # Variable defined but value is empty or whitespace-only
     MISSING_VARS+=("$var")
   fi
 done
 
 if [ ${#MISSING_VARS[@]} -gt 0 ]; then
-  echo -e "${RED}Error: Missing required environment variables:${NC}"
+  echo -e "${RED}Error: Missing required environment variables (missing or empty values):${NC}"
   for var in "${MISSING_VARS[@]}"; do
     echo -e "${RED}  - $var${NC}"
   done
@@ -175,7 +188,9 @@ echo -e "${GREEN}✓ Startup script created${NC}"
 echo -e "${YELLOW}Step 9: Verifying server startup...${NC}"
 
 # Load environment variables temporarily
-export $(cat .env.production | grep -v '^#' | xargs) 2>/dev/null || true
+set -a
+. ".env.production"
+set +a
 
 # Test server startup
 timeout 10 node server.js &
@@ -259,7 +274,7 @@ echo "   - Railway: git push origin main"
 echo "   - AWS Lambda: serverless deploy"
 echo ""
 echo -e "${YELLOW}Documentation:${NC}"
-echo "- Deployment Guide: $PROJECT_ROOT/DEPLOYMENT_GUIDE.md"
-echo "- Backend Setup: $PROJECT_ROOT/BACKEND_API_SETUP.md"
+echo "- Deployment Guide: $PROJECT_ROOT/BACKEND_DEPLOYMENT_GUIDE.md"
+echo "- Cost Monitoring: See CostMonitoringScreen.js"
 echo "- Environment Variables: .env.production"
 echo ""

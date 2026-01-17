@@ -17,7 +17,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { LineChart, BarChart, ProgressChart } from 'react-native-chart-kit';
+import { ProgressChart } from 'react-native-chart-kit';
 import axios from 'axios';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -36,11 +36,11 @@ const CostMonitoringScreen = () => {
       setError(null);
       
       // Get current cost summary
-      const summaryResponse = await axios.get(`${API_BASE_URL}/cost/stats`);
+      const summaryResponse = await axios.get(`${API_BASE_URL}/transcribe/costs/stats`);
       setCostData(summaryResponse.data.costSummary);
 
       // Get cost history (last 30 days)
-      const historyResponse = await axios.get(`${API_BASE_URL}/cost/log?limit=100`);
+      const historyResponse = await axios.get(`${API_BASE_URL}/transcribe/costs/log?limit=100`);
       setCostHistory(historyResponse.data.costLog || []);
       
       setLoading(false);
@@ -109,19 +109,6 @@ const CostMonitoringScreen = () => {
 
   const alertLevel = getAlertLevel(percentageUsed);
   const alertColor = alertLevel === 'critical' ? '#ff4444' : alertLevel === 'warning' ? '#ffaa00' : '#00cc00';
-
-  // Prepare chart data
-  const chartData = {
-    labels: Object.keys(byService),
-    datasets: [
-      {
-        data: Object.values(byService),
-        fill: true,
-        strokeWidth: 2,
-        color: (opacity = 1) => `rgba(26, 255, 146, ${opacity})`,
-      },
-    ],
-  };
 
   const progressData = {
     labels: ['Cost Usage'],
@@ -192,7 +179,7 @@ const CostMonitoringScreen = () => {
               backgroundColor: '#ffffff',
               backgroundGradientFrom: '#f5f5f5',
               backgroundGradientTo: '#f5f5f5',
-              color: (opacity = 1) => `rgba(${alertColor}, ${opacity})`,
+              color: (opacity = 1) => alertColor,
               strokeWidth: 2,
             }}
             hideLegend={true}
@@ -239,12 +226,12 @@ const CostMonitoringScreen = () => {
         <View style={styles.limitsContainer}>
           <View style={styles.limitItem}>
             <Text style={styles.limitLabel}>Daily Limit</Text>
-            <Text style={styles.limitValue}>$100.00</Text>
+            <Text style={styles.limitValue}>${(parseFloat(process.env.REACT_APP_COST_DAILY_LIMIT) || 100).toFixed(2)}</Text>
             <Text style={styles.limitStatus}>🟢 Safe</Text>
           </View>
           <View style={styles.limitItem}>
             <Text style={styles.limitLabel}>Monthly Limit</Text>
-            <Text style={styles.limitValue}>$1000.00</Text>
+            <Text style={styles.limitValue}>${(parseFloat(process.env.REACT_APP_COST_MONTHLY_LIMIT) || 1000).toFixed(2)}</Text>
             <Text
               style={[
                 styles.limitStatus,

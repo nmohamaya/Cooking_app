@@ -40,9 +40,15 @@ const validateProductionEnvironment = () => {
     invalid.push(`PORT must be a number, got: ${process.env.PORT}`);
   }
 
-  // Check for API keys
-  if (process.env.GITHUB_TOKEN && !process.env.GITHUB_TOKEN.startsWith('ghp_')) {
-    invalid.push('GITHUB_TOKEN does not appear to be a valid GitHub Personal Access Token');
+  // Check for API keys - validate GitHub token format
+  if (process.env.GITHUB_TOKEN) {
+    const validGithubTokenPrefixes = ['ghp_', 'github_pat_', 'gho_', 'ghu_', 'ghs_', 'ghr_'];
+    const hasValidGithubTokenPrefix = validGithubTokenPrefixes.some(prefix =>
+      process.env.GITHUB_TOKEN.startsWith(prefix)
+    );
+    if (!hasValidGithubTokenPrefix) {
+      invalid.push('GITHUB_TOKEN does not appear to be a valid GitHub Personal Access Token');
+    }
   }
 
   // Report validation results
@@ -108,9 +114,8 @@ const performHealthChecks = async () => {
     cache: false,
   };
 
-  // Check GitHub token by making a test API call
+  // Check GitHub token by making a test API call (using built-in fetch in Node.js 18+)
   try {
-    const fetch = require('node-fetch');
     const response = await fetch('https://models.inference.ai.azure.com/health', {
       headers: {
         'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
