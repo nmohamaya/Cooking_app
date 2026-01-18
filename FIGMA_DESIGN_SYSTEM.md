@@ -3,7 +3,7 @@
 **Issue**: [#146 - Design System & Figma Mockups](https://github.com/nmohamaya/Cooking_app/issues/146)  
 **Epic**: [#145 - Beautiful UI Redesign](https://github.com/nmohamaya/Cooking_app/issues/145)  
 **Status**: In Progress  
-**Last Updated**: January 17, 2026
+**Last Updated**: January 18, 2026
 
 ---
 
@@ -83,7 +83,7 @@ Text Gray-D: #BDBDBD  (Secondary text - dark mode)
 #### Status Colors
 ```
 Success:     #27AE60 (Green)
-Warning:     #F39C12 (Gold)
+Warning:     #F1C40F (Yellow)
 Danger:      #E74C3C (Red)
 Info:        #3498DB (Blue)
 ```
@@ -93,8 +93,8 @@ Info:        #3498DB (Blue)
 ## 🔤 Typography System
 
 ### Font Families
-- **Headers & Titles**: Playfair Display (Bold, 700)
-- **Body & UI Text**: Inter (Regular 400, Medium 500, Bold 700)
+- **Headers & Titles**: Playfair Display, "Times New Roman", Times, serif (Bold, 700)
+- **Body & UI Text**: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif (Regular 400, Medium 500, Bold 700)
 
 ### Size Scale
 
@@ -178,7 +178,6 @@ State: Pressed
 - Text: Primary-400
 - Text Style: Body, Bold
 - Hover: Text: Primary-500, Add shadow
-
 ```
 
 ### Card Components
@@ -395,7 +394,7 @@ Swipe to dismiss gesture support
 ├──────────────────────────────┤
 │ Total: $15.83                │
 │                              │
-│ [Share] [Print] [Buy Now 🛍] │
+│ [Share] [Print] [Buy Now 🛍* ] │  ← *Future e-commerce feature
 └──────────────────────────────┘
 ```
 
@@ -407,7 +406,7 @@ Swipe to dismiss gesture support
 - Total cost calculator
 - Swipe-to-delete gesture
 - Share and print options
-- "Buy now" integration option
+- "Buy now" integration option (planned for Q2 2026 e-commerce feature)
 
 ---
 
@@ -613,8 +612,8 @@ Opacity Changes:    150ms ease-in
 ## 📊 Responsive Breakpoints
 
 ```
-Mobile:  320px - 479px
-Tablet:  480px - 1023px
+Mobile:  320px - 480px
+Tablet:  481px - 1024px
 Desktop: 1024px+
 ```
 
@@ -676,7 +675,8 @@ Desktop: 1024px+
 
 ### Figma Plugins
 - **Figma to React**: Auto-generate React components
-- **Pricetag**: Component pricing analysis
+- **Design Lint**: Find inconsistent or missing styles in your design system
+- **Stark**: Accessibility and contrast checking (WCAG compliance)
 - **Design QA**: Quality assurance checks
 - **Unsplash**: Stock images
 
@@ -780,9 +780,14 @@ After Issue #146 (Design System) is complete:
 
 ---
 
-**Last Updated**: January 17, 2026  
+**Last Updated**: January 18, 2026  
 **Figma Link**: TBD (to be added after creation)  
 **Design Lead**: TBD  
 **Status**: Ready to Start
+
+### Related Documentation
+- [UI Redesign Epic Guide](./UI_REDESIGN_EPIC_GUIDE.md) - Epic planning and sub-issues
+- [NativeBase Component Library](https://nativebase.io) - Component reference
+- [Design Implementation Guide](./docs/DESIGN_IMPLEMENTATION.md) - Dev handoff
 
 Let's create something beautiful! 🎨✨
