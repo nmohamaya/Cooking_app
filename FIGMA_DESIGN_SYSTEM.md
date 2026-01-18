@@ -83,7 +83,7 @@ Text Gray-D: #BDBDBD  (Secondary text - dark mode)
 #### Status Colors
 ```
 Success:     #27AE60 (Green)
-Warning:     #F39C12 (Gold)
+Warning:     #F1C40F (Yellow)
 Danger:      #E74C3C (Red)
 Info:        #3498DB (Blue)
 ```
@@ -178,7 +178,6 @@ State: Pressed
 - Text: Primary-400
 - Text Style: Body, Bold
 - Hover: Text: Primary-500, Add shadow
-
 ```
 
 ### Card Components
@@ -676,7 +675,8 @@ Desktop: 1024px+
 
 ### Figma Plugins
 - **Figma to React**: Auto-generate React components
-- **Pricetag**: Component pricing analysis
+- **Design Lint**: Find inconsistent or missing styles in your design system
+- **Stark**: Accessibility and contrast checking (WCAG compliance)
 - **Design QA**: Quality assurance checks
 - **Unsplash**: Stock images
 
