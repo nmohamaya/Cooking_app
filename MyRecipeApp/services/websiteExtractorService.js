@@ -4,7 +4,7 @@
  * Supports content parsing, recipe extraction, and metadata collection
  */
 
-import { AsyncStorage } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from './apiClient';
 
 /**

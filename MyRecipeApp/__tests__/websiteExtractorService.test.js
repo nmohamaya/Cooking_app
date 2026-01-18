@@ -15,18 +15,17 @@ import {
   analyzeWebsiteError,
   validateRecipeData,
 } from '../services/websiteExtractorService';
-import { AsyncStorage } from 'react-native';
 
-// Mock AsyncStorage
-jest.mock('react-native', () => ({
-  AsyncStorage: {
-    getItem: jest.fn(),
-    setItem: jest.fn(),
-    removeItem: jest.fn(),
-    multiRemove: jest.fn(),
-    getAllKeys: jest.fn(),
-  },
+// Mock AsyncStorage (correct package)
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+  multiRemove: jest.fn(),
+  getAllKeys: jest.fn(),
 }));
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Simple URL key generator instead of Buffer-based
 const encodeUrl = (url) => {

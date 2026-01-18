@@ -13,17 +13,14 @@ import {
   getCacheExpiration,
   analyzeTranscriptError,
 } from '../services/youtubeExtractorService';
-import { AsyncStorage } from 'react-native';
 
-// Mock AsyncStorage
-jest.mock('react-native', () => ({
-  AsyncStorage: {
-    getItem: jest.fn(),
-    setItem: jest.fn(),
-    removeItem: jest.fn(),
-    multiRemove: jest.fn(),
-    getAllKeys: jest.fn(),
-  },
+// Mock AsyncStorage (correct package)
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+  multiRemove: jest.fn(),
+  getAllKeys: jest.fn(),
 }));
 
 // Mock axios for backend API calls
@@ -32,6 +29,7 @@ jest.mock('axios', () => ({
 }));
 
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 describe('youtubeExtractorService', () => {
   beforeEach(() => {
