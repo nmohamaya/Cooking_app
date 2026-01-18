@@ -4,7 +4,7 @@
  * Supports video download, metadata extraction, and recipe parsing
  */
 
-import { AsyncStorage } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from './apiClient';
 
 /**

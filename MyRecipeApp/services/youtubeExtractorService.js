@@ -8,7 +8,7 @@
  * - POST /api/transcribe - Extract and transcribe audio
  */
 
-import { AsyncStorage } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 /**
