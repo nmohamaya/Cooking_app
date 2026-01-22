@@ -552,3 +552,55 @@ export const extractRecipeFromYoutube = async (url, options = {}) => {
     };
   }
 };
+
+/**
+ * Get YouTube content (transcript and metadata) for recipe extraction
+ * This is the main function called by the RecipeLinkExtractionModal
+ * @param {string} url - YouTube URL
+ * @returns {Promise<Object|null>} - Content object or null on failure
+ */
+export const getYouTubeContent = async (url) => {
+  try {
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+      console.error('[YouTube] Invalid URL provided');
+      return null;
+    }
+
+    console.log('[YouTube] Extracting content from:', url);
+
+    // Extract video ID from URL
+    const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+    if (!videoIdMatch || !videoIdMatch[1]) {
+      console.error('[YouTube] Could not extract video ID from URL');
+      return null;
+    }
+
+    const videoId = videoIdMatch[1];
+    console.log('[YouTube] Video ID:', videoId);
+
+    // Get transcript via backend API
+    const transcriptResult = await getYoutubeTranscript(videoId);
+    
+    if (!transcriptResult.success) {
+      console.error('[YouTube] Failed to get transcript:', transcriptResult.error);
+      return null;
+    }
+
+    console.log('[YouTube] Transcript retrieved successfully');
+
+    // Return content in format expected by RecipeLinkExtractionModal
+    return {
+      url,
+      videoId,
+      title: `Recipe from YouTube Video ${videoId}`,
+      content: transcriptResult.transcript,
+      caption: transcriptResult.transcript,
+      platform: 'youtube',
+      extractedAt: new Date().toISOString(),
+      language: transcriptResult.language || 'en',
+    };
+  } catch (error) {
+    console.error('[YouTube] Error extracting content:', error.message);
+    return null;
+  }
+};
