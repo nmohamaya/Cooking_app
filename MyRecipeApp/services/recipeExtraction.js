@@ -182,6 +182,13 @@ export const extractRecipeFromTranscript = async (transcript) => {
 - prepTime: string (e.g., "15 minutes")
 - cookTime: string (e.g., "30 minutes")
 
+IMPORTANT RULES:
+1. ONLY use information that is explicitly mentioned in the transcript. Do NOT invent, guess, or add any ingredients or steps not present.
+2. The transcript comes from auto-generated video captions and may be out of order — reconstruct the logical recipe order.
+3. If the video contains multiple recipes, extract the MAIN or FIRST recipe.
+4. Ignore promotional text like "subscribe", "like", channel promos, greetings, etc.
+5. If a field is not mentioned in the transcript, use empty string.
+
 For category, analyze the recipe content to determine the best fit:
 - Use "Breakfast" for morning meals (pancakes, eggs, oatmeal, etc.)
 - Use "Lunch" or "Dinner" for main meals
@@ -192,15 +199,14 @@ For category, analyze the recipe content to determine the best fit:
 - Use "Vegan" if the recipe contains NO animal products
 - Use "Vegetarian" if the recipe contains NO meat/fish but may have dairy/eggs
 
-If multiple categories apply, choose the most specific one. If unsure, use "Dinner" as default.
-If any other field is not mentioned, use empty string. Be concise and clear.`
+If multiple categories apply, choose the most specific one. If unsure, use "Dinner" as default.`
           },
           {
             role: 'user',
             content: `Extract the recipe from this cooking video transcript:\n\n${transcript}`
           }
         ],
-        temperature: 0.3,
+        temperature: 0.1,
         max_tokens: 1000,
         response_format: { type: 'json_object' }
       },
