@@ -153,23 +153,6 @@ const VideoRecipeExtractionWorkflow = ({
       setProgressStep(3);
       console.log('🤖 Sending transcript to AI for recipe extraction...');
       
-      // Check if GitHub token is configured
-      if (!process.env.EXPO_PUBLIC_GITHUB_TOKEN && typeof window !== 'undefined') {
-        // Browser environment without token
-        throw new Error(
-          'GitHub token not configured! 🔐\n\n' +
-          'Recipe extraction requires a GitHub token for AI access.\n\n' +
-          'Setup Instructions:\n' +
-          '1. Go to: https://github.com/settings/tokens\n' +
-          '2. Click "Generate new token (classic)"\n' +
-          '3. Select scopes: repo, read:packages\n' +
-          '4. Create file ".env" in MyRecipeApp folder\n' +
-          '5. Add: GITHUB_TOKEN=your_token_here\n' +
-          '6. Restart the app (npm start)\n\n' +
-          'GitHub Models offers FREE access to GPT-4o!'
-        );
-      }
-      
       const recipe = await extractRecipeFromText(transcript);
       console.log('🔍 AI extraction result:', recipe);
 
@@ -309,6 +292,12 @@ const VideoRecipeExtractionWorkflow = ({
               platforms={['YouTube', 'TikTok', 'Instagram', 'Blog']}
             />
 
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>⚠️ {error}</Text>
+              </View>
+            )}
+
             <View style={styles.supportedPlatforms}>
               <Text style={styles.platformsTitle}>Supported Platforms:</Text>
               <Text style={styles.platformItem}>🎥 YouTube</Text>
@@ -396,6 +385,10 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 20,
     lineHeight: 20,
+  },
+  errorContainer: {
+    marginTop: 10,
+    marginBottom: 10,
   },
   errorText: {
     color: '#d32f2f',
