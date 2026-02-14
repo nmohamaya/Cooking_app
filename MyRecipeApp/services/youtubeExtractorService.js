@@ -273,77 +273,172 @@ const cacheTranscript = async (videoId, language, transcript) => {
 /**
  * Fetch transcript from YouTube API via backend
  * @private
- * Calls backend endpoints: /api/download → /api/transcribe
+ * Strategy:
+ * 1. Try fast path: extract auto-generated subtitles/captions (no download needed)
+ * 2. Fall back: download video → extract audio → AI transcription
  */
 const fetchTranscriptFromAPI = async (videoId, language) => {
   try {
     console.log(`🎬 [YouTube] Starting extraction for video: ${videoId}`);
-    
-    // Step 1: Extract YouTube URL from video ID
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    
-    // Step 2: Call backend to download video
-    console.log(`📥 [YouTube] Downloading video from URL...`);
+
+    // === FAST PATH: Try subtitle extraction first ===
+    try {
+      console.log(`📝 [YouTube] Trying subtitle/caption extraction (fast path)...`);
+      const subtitleResponse = await axios.post(
+        `${BACKEND_CONFIG.BASE_URL}/api/download/subtitles`,
+        {
+          url: youtubeUrl,
+          language: language || 'en',
+        },
+        { timeout: 60000 } // 60s should be plenty for subtitle extraction
+      );
+
+      if (subtitleResponse.data.success && subtitleResponse.data.transcript) {
+        const transcript = subtitleResponse.data.transcript;
+        console.log(`✅ [YouTube] Subtitles extracted successfully (${transcript.length} chars)`);
+        return transcript;
+      }
+    } catch (subtitleError) {
+      // Subtitle extraction failed - this is expected for some videos
+      const errorMsg = subtitleError.response?.data?.error || subtitleError.message;
+      console.log(`⚠️ [YouTube] Subtitle extraction unavailable: ${errorMsg}`);
+      console.log(`🔄 [YouTube] Falling back to download + transcription pipeline...`);
+    }
+
+    // === SLOW PATH: Download video → extract audio → transcribe ===
+    console.log(`📥 [YouTube] Starting video download...`);
     const downloadResponse = await axios.post(
       `${BACKEND_CONFIG.BASE_URL}/api/download`,
       { 
         url: youtubeUrl,
         platform: 'youtube'
       },
-      { timeout: BACKEND_CONFIG.TIMEOUT_MS }
+      { timeout: 30000 }
     );
 
-    if (!downloadResponse.data.success) {
-      throw new Error(
-        downloadResponse.data.error || 'Failed to download video'
-      );
+    const downloadJobId = downloadResponse.data.jobId;
+    if (!downloadJobId) {
+      throw new Error('Backend did not return a download job ID');
     }
+    console.log(`📥 [YouTube] Download job started: ${downloadJobId}`);
 
-    const { videoPath, metadata } = downloadResponse.data;
-    console.log(`✨ [YouTube] Video downloaded successfully`);
+    // Poll download job until completed
+    const downloadResult = await pollJobStatus(
+      `${BACKEND_CONFIG.BASE_URL}/api/download/${downloadJobId}`,
+      'Download',
+      BACKEND_CONFIG.TIMEOUT_MS
+    );
 
-    // Step 3: Call backend to transcribe audio
-    console.log(`🤖 [YouTube] Transcribing audio...`);
+    const audioPath = downloadResult.result?.audioPath;
+    const audioDuration = downloadResult.result?.duration;
+    if (!audioPath) {
+      throw new Error('Download completed but no audio path returned');
+    }
+    console.log(`✅ [YouTube] Video downloaded and audio extracted: ${audioPath}`);
+
+    // Start transcription job
+    console.log(`🤖 [YouTube] Starting transcription...`);
+    const audioMinutes = audioDuration ? audioDuration / 60 : 15;
     const transcribeResponse = await axios.post(
       `${BACKEND_CONFIG.BASE_URL}/api/transcribe`,
       {
-        videoPath,
-        language: language || 'en'
+        audioFilePath: audioPath,
+        language: language || 'en',
+        audioMinutes: Math.ceil(audioMinutes)
       },
-      { timeout: BACKEND_CONFIG.TIMEOUT_MS }
+      { timeout: 30000 }
     );
 
-    if (!transcribeResponse.data.success) {
-      throw new Error(
-        transcribeResponse.data.error || 'Failed to transcribe audio'
-      );
+    const transcribeJobId = transcribeResponse.data.jobId;
+    if (!transcribeJobId) {
+      throw new Error('Backend did not return a transcription job ID');
     }
+    console.log(`🤖 [YouTube] Transcription job started: ${transcribeJobId}`);
 
-    const { transcript, confidence } = transcribeResponse.data;
+    // Poll transcription job until completed
+    const transcribeResult = await pollJobStatus(
+      `${BACKEND_CONFIG.BASE_URL}/api/transcribe/${transcribeJobId}`,
+      'Transcription',
+      BACKEND_CONFIG.TIMEOUT_MS
+    );
+
+    const transcript = transcribeResult.result?.text;
+    const confidence = transcribeResult.result?.confidence;
+    if (!transcript) {
+      throw new Error('Transcription completed but no text returned');
+    }
     console.log(`✅ [YouTube] Transcription complete (confidence: ${confidence})`);
 
     return transcript;
   } catch (error) {
     console.error('❌ [YouTube] Extraction failed:', error.message);
     
-    // If backend is not available, fall back to mock for development/testing
     if (error.code === 'ECONNREFUSED' || error.message.includes('Network')) {
       console.warn('⚠️ [YouTube] Backend unavailable, using mock data for development');
       return getMockTranscript(videoId);
     }
     
-    // Provide helpful error messages
     if (error.message.includes('404')) {
       throw new Error('Video not found. Please check the YouTube URL.');
     } else if (error.message.includes('403')) {
       throw new Error('Video is private or restricted.');
-    } else if (error.message.includes('timeout')) {
+    } else if (error.message.includes('timeout') || error.message.includes('Timeout')) {
       throw new Error('Video download or transcription took too long. Try a shorter video.');
     } else if (error.message.includes('ECONNREFUSED')) {
       throw new Error('Cannot connect to backend server. Please ensure the server is running.');
     }
     
     throw error;
+  }
+};
+
+/**
+ * Poll a job status endpoint until completion or failure
+ * @private
+ * @param {string} statusUrl - Full URL to poll
+ * @param {string} label - Label for logging (e.g., 'Download', 'Transcription')
+ * @param {number} timeoutMs - Maximum time to wait
+ * @returns {Promise<Object>} - Completed job data
+ */
+const pollJobStatus = async (statusUrl, label, timeoutMs) => {
+  const pollInterval = 3000; // Poll every 3 seconds
+  const startTime = Date.now();
+
+  while (true) {
+    const elapsed = Date.now() - startTime;
+    if (elapsed > timeoutMs) {
+      throw new Error(`${label} timed out after ${Math.round(elapsed / 1000)}s`);
+    }
+
+    // Wait before polling
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+    try {
+      const response = await axios.get(statusUrl, { timeout: 10000 });
+      const job = response.data;
+
+      console.log(`⏳ [${label}] Status: ${job.status}, Progress: ${job.progress}%`);
+
+      if (job.status === 'completed') {
+        return job;
+      }
+
+      if (job.status === 'failed') {
+        throw new Error(
+          job.error?.message || job.error || `${label} failed on server`
+        );
+      }
+
+      // Continue polling for 'pending', 'processing', 'queued' statuses
+    } catch (error) {
+      // If it's our own thrown error (from failed status), rethrow
+      if (error.message.includes('failed on server') || error.message.includes('timed out')) {
+        throw error;
+      }
+      // Network errors during polling - log and retry
+      console.warn(`⚠️ [${label}] Poll error (will retry): ${error.message}`);
+    }
   }
 };
 

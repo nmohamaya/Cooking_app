@@ -218,6 +218,10 @@ async function processDownload(jobId, url, quality) {
       quality
     );
     job.audioPath = audioResult.audioPath; // Store for cleanup on error
+    job.audioId = audioResult.audioId;
+    job.duration = audioResult.duration;
+    job.size = audioResult.size;
+    job.quality = audioResult.quality;
     job.steps.audioExtraction = 'completed';
     job.progress = 100;
 
@@ -309,6 +313,57 @@ router.delete('/:jobId', async (req, res) => {
     logger.error(`Cancel endpoint error: ${error.message}`);
     return res.status(500).json({
       error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/download/subtitles
+ * Extract subtitles/captions from a video URL (fast path - no download needed)
+ * Returns transcript directly without async polling
+ */
+router.post('/subtitles', async (req, res) => {
+  try {
+    const { url, language = 'en' } = req.body;
+
+    if (!url) {
+      return res.status(400).json({
+        error: 'Missing URL',
+        message: 'URL parameter is required'
+      });
+    }
+
+    if (!downloadService.validateUrl(url)) {
+      return res.status(400).json({
+        error: 'Invalid URL',
+        message: 'URL must be from a supported platform'
+      });
+    }
+
+    logger.info(`Subtitle extraction requested for: ${url}`, { language });
+
+    const subtitleService = require('../services/subtitleService');
+    const result = await subtitleService.extractSubtitles(url, language);
+
+    if (!result.success) {
+      return res.status(404).json({
+        success: false,
+        error: result.error || 'No subtitles available',
+        message: 'Could not extract subtitles from this video'
+      });
+    }
+
+    return res.json({
+      success: true,
+      transcript: result.text,
+      language: result.language,
+      source: result.source
+    });
+  } catch (error) {
+    logger.error(`Subtitle extraction error: ${error.message}`);
+    return res.status(500).json({
+      error: 'Subtitle Extraction Failed',
       message: error.message
     });
   }
