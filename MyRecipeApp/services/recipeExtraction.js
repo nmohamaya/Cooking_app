@@ -2,9 +2,9 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 
 // GitHub Models API Configuration
-// In React Native/Expo, use Constants.expoConfig.extra for environment variables
-// Using GitHub Models provides free access to AI models for GitHub users
-const GITHUB_TOKEN = Constants.expoConfig?.extra?.githubToken || '';
+// EXPO_PUBLIC_ prefixed vars are auto-inlined by Expo into the web bundle
+// Constants.expoConfig.extra works on native but not reliably on web
+const GITHUB_TOKEN = process.env.EXPO_PUBLIC_GITHUB_TOKEN || Constants.expoConfig?.extra?.githubToken || '';
 const API_URL = 'https://models.inference.ai.azure.com';
 const MODEL_NAME = 'gpt-4o'; // Free GitHub Models: gpt-4o, gpt-4o-mini, llama-3.1-405b, etc.
 const EXTRACTION_TIMEOUT = 15000; // 15 second timeout
