@@ -64,7 +64,8 @@ const downloadVideo = async (url, outputDir = env.uploadDir) => {
       // Use yt-dlp to download video
       // Note: yt-dlp must be installed separately: pip install yt-dlp
       const ytDlp = spawn('yt-dlp', [
-        '-f', 'best[ext=mp4]', // Download best MP4 format
+        '--js-runtimes', 'node', // Required: JavaScript runtime for YouTube extraction
+        '-f', 'best', // Download best available format
         '-o', filePath,
         '--socket-timeout', '30', // 30 second timeout
         '--fragment-retries', '3',
@@ -193,6 +194,7 @@ const getVideoMetadata = async (url) => {
 
     return new Promise((resolve, reject) => {
       const ytDlp = spawn('yt-dlp', [
+        '--js-runtimes', 'node', // Required: JavaScript runtime for YouTube extraction
         '--dump-json',
         '--socket-timeout', '30',
         url
