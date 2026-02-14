@@ -83,15 +83,18 @@ const VideoRecipeExtractionWorkflow = ({
     }
   };
 
-  const extractRecipeFromVideo = async () => {
+  const extractRecipeFromVideo = async (videoUrl) => {
+    // Use passed URL or fall back to state
+    const targetUrl = videoUrl || url;
+    
     try {
       // Step 1: Get video transcript based on URL platform
-      console.log('🎬 Starting video extraction for URL:', url);
+      console.log('🎬 Starting video extraction for URL:', targetUrl);
       setProgressStep(1);
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const provider = urlValidator.getVideoProvider(url);
-      const videoId = urlValidator.extractVideoId(url);
+      const provider = urlValidator.getVideoProvider(targetUrl);
+      const videoId = urlValidator.extractVideoId(targetUrl);
 
       console.log('📺 Detected provider:', provider, 'Video ID:', videoId);
 
@@ -278,10 +281,18 @@ const VideoRecipeExtractionWorkflow = ({
                 setProgressStep(1);
                 setError(null);
               }}
-              onExtractSuccess={async () => {
-                // Trigger the extraction workflow
+              onExtractSuccess={async (data) => {
+                // Get URL from the extraction data
+                const videoUrl = data?.url;
+                console.log('🔵 VideoRecipeInput onExtractSuccess called with URL:', videoUrl);
+                
+                if (videoUrl) {
+                  setUrl(videoUrl);
+                }
+                
+                // Trigger the extraction workflow with the URL
                 try {
-                  await simulateExtractionWorkflow();
+                  await extractRecipeFromVideo(videoUrl);
                 } catch (err) {
                   setError(err.message || 'Failed to extract recipe from video');
                   setIsProcessing(false);
@@ -289,6 +300,7 @@ const VideoRecipeExtractionWorkflow = ({
                 }
               }}
               onExtractError={(errorInfo) => {
+                console.log('🔴 VideoRecipeInput onExtractError:', errorInfo);
                 setError(errorInfo.message || 'Failed to extract recipe');
                 setIsProcessing(false);
               }}

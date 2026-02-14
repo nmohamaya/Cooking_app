@@ -711,9 +711,14 @@ export const isValidParsedRecipe = (recipe) => {
   return hasIngredients && hasInstructions && hasReasonableConfidence;
 };
 
-export default {
+/**
+ * Named export for importing as textParsingService object
+ */
+export const textParsingService = {
   parseIngredients,
   parseInstructions,
   parseRecipeText,
   isValidParsedRecipe,
 };
+
+export default textParsingService;

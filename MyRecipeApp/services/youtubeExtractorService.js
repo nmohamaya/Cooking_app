@@ -604,3 +604,21 @@ export const getYouTubeContent = async (url) => {
     return null;
   }
 };
+
+/**
+ * Default export for importing as youtubeExtractorService object
+ */
+export const youtubeExtractorService = {
+  getYoutubeTranscript,
+  getAvailableLanguages,
+  getYoutubeTranscriptCached,
+  parseTranscriptWithTimestamps,
+  clearTranscriptCache,
+  clearAllTranscriptCache,
+  getCacheExpiration,
+  analyzeTranscriptError,
+  downloadYoutubeVideo,
+  getTranscriptViaApi,
+  extractRecipeFromYoutube,
+  getYouTubeContent,
+};

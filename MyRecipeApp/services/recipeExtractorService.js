@@ -326,3 +326,41 @@ export const isValidRecipeLink = (url) => {
   const result = parseRecipeLink(url);
   return result.isValid === true;
 };
+
+/**
+ * Validate if a URL contains recipe content
+ * This is used by RecipeLinkExtractionModal to check before extraction
+ * @param {string} url - URL to validate
+ * @returns {Promise<Object>} - {isRecipeUrl: boolean, platform: string, error?: string}
+ */
+export const validateRecipeUrl = async (url) => {
+  try {
+    const result = parseRecipeLink(url);
+    return {
+      isRecipeUrl: result.isValid,
+      platform: result.platform || null,
+      videoId: result.videoId || null,
+      error: result.error || null,
+    };
+  } catch (error) {
+    return {
+      isRecipeUrl: false,
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * Default export for importing as recipeExtractorService object
+ */
+export const recipeExtractorService = {
+  parseRecipeLink,
+  getPlatformFromUrl,
+  normalizeRecipeUrl,
+  validateYoutubeUrl,
+  validateTiktokUrl,
+  validateInstagramUrl,
+  isValidRecipeLink,
+  validateRecipeUrl,
+  PLATFORMS,
+};

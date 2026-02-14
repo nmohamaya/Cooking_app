@@ -490,3 +490,19 @@ function analyzeSocialMediaError(error) {
     };
   }
 }
+
+/**
+ * Default export for importing as socialMediaExtractorService object
+ */
+export const socialMediaExtractorService = {
+  getSocialMediaContentCached,
+  getAvailableExtractionMethods,
+  getTikTokContent,
+  getInstagramContent,
+  clearTikTokCache,
+  clearInstagramCache,
+  clearAllSocialMediaCache,
+  getCacheExpiration,
+  isCacheValid,
+  parseContentMetadata,
+};

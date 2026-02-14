@@ -74,6 +74,8 @@ const RecipeLinkExtractionModal = ({
   };
 
   const extractContent = async () => {
+    console.log('🔵 [Extract] Starting extraction for URL:', url);
+    
     if (!url.trim()) {
       setError('Please enter a URL');
       return;
@@ -89,52 +91,70 @@ const RecipeLinkExtractionModal = ({
 
     try {
       // Step 1: Validate and extract URL content
+      console.log('🔵 [Extract] Step 1: Validating URL...');
       const validation = await recipeExtractorService.validateRecipeUrl(url);
+      console.log('🔵 [Extract] Step 1 result:', JSON.stringify(validation));
       
       if (!validation.isRecipeUrl) {
+        console.log('🔴 [Extract] URL validation failed - not a recipe URL');
         setError('This URL does not appear to contain recipe content');
         setLoading(false);
         return;
       }
 
       // Step 2: Extract content based on platform
+      console.log('🔵 [Extract] Step 2: Extracting content...');
       let rawContent = null;
       const urlLower = url.toLowerCase();
 
       if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
+        console.log('🔵 [Extract] Detected YouTube URL, calling getYouTubeContent...');
         const youtubeResult = await youtubeExtractorService.getYouTubeContent(url);
+        console.log('🔵 [Extract] YouTube result:', youtubeResult ? 'Got content' : 'NULL');
         if (youtubeResult) {
           rawContent = youtubeResult;
         }
       } else if (urlLower.includes('tiktok.com') || urlLower.includes('instagram.com')) {
+        console.log('🔵 [Extract] Detected social media URL...');
         const socialResult = await socialMediaExtractorService.getSocialMediaContentCached(url);
         if (socialResult) {
           rawContent = socialResult;
         }
       } else {
+        console.log('🔵 [Extract] Generic URL, using fallback...');
         // Generic extraction
         rawContent = { url, title: 'Recipe Content', content: url };
       }
 
       if (!rawContent) {
+        console.log('🔴 [Extract] No content extracted');
         setError('Unable to extract content from this URL. The content may be restricted or unavailable.');
         setLoading(false);
         return;
       }
 
+      console.log('🔵 [Extract] Step 2 complete, got rawContent');
       setExtractedData(rawContent);
 
       // Step 3: Parse extracted content
+      console.log('🔵 [Extract] Step 3: Parsing recipe text...');
       const textToParse = rawContent.caption || rawContent.content || rawContent.title || '';
+      console.log('🔵 [Extract] Text to parse length:', textToParse.length);
       const parsed = await textParsingService.parseRecipeText(textToParse);
+      console.log('🔵 [Extract] Parsed result:', parsed ? 'Got parsed data' : 'NULL');
 
       // Validate parsed recipe
-      if (!textParsingService.isValidParsedRecipe(parsed)) {
+      const isValid = textParsingService.isValidParsedRecipe(parsed);
+      console.log('🔵 [Extract] Recipe valid:', isValid);
+      
+      if (!isValid) {
+        console.log('🔴 [Extract] Parsed recipe is not valid');
         setError('Could not extract recipe information from this content. The content may not contain structured recipe data.');
         setLoading(false);
         return;
       }
 
+      console.log('🟢 [Extract] Success! Moving to preview...');
       setParsedRecipe(parsed);
       setEditedRecipe({
         title: rawContent.title || 'Recipe from Link',
@@ -147,7 +167,8 @@ const RecipeLinkExtractionModal = ({
 
       setStep('preview');
     } catch (err) {
-      console.error('Extraction error:', err);
+      console.error('🔴 [Extract] ERROR:', err.message);
+      console.error('🔴 [Extract] Stack:', err.stack);
       setError(`Error during extraction: ${err.message}`);
     } finally {
       setLoading(false);
