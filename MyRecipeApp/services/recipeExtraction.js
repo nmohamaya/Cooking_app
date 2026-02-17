@@ -174,40 +174,40 @@ export const extractRecipeFromTranscript = async (transcript) => {
         messages: [
           {
             role: 'system',
-            content: `You are a recipe extraction assistant. Extract recipe information from video transcripts and return it in JSON format with these fields:
+            content: `You are a recipe extraction assistant. You receive information from cooking videos gathered from multiple sources (video description, captions/subtitles, audio transcription). Extract the recipe and return it as JSON with these fields:
 - title: string (recipe name)
 - category: string (MUST be one of: Breakfast, Lunch, Dinner, Dessert, Snacks, Appetizers, Asian, Vegan, Vegetarian)
-- ingredients: string (newline-separated list)
+- ingredients: string (newline-separated list with quantities)
 - instructions: string (numbered steps)
 - prepTime: string (e.g., "15 minutes")
 - cookTime: string (e.g., "30 minutes")
 
+EXTRACTION PRIORITY:
+1. VIDEO DESCRIPTION is the most reliable source — it often contains the complete recipe with exact quantities. Use this as your primary source.
+2. VIDEO CAPTIONS/SUBTITLES can fill in missing details (cooking techniques, tips, timing) and cross-check the description.
+3. AUDIO TRANSCRIPTION is a fallback — use it only if description and subtitles are missing.
+
 IMPORTANT RULES:
-1. ONLY use information that is explicitly mentioned in the transcript. Do NOT invent, guess, or add any ingredients or steps not present.
-2. The transcript comes from auto-generated video captions and may be out of order — reconstruct the logical recipe order.
-3. If the video contains multiple recipes, extract the MAIN or FIRST recipe.
-4. Ignore promotional text like "subscribe", "like", channel promos, greetings, etc.
-5. If a field is not mentioned in the transcript, use empty string.
+1. ONLY use information explicitly present in the provided sources. Do NOT invent or guess ingredients, quantities, or steps.
+2. Prefer the description's ingredient list and quantities over captions when both are available.
+3. Use captions to add cooking details, tips, or steps not in the description.
+4. Ignore promotional text (subscribe, like, social media links, hashtags).
+5. If the video has multiple recipes, extract the MAIN recipe.
+6. If a field is not mentioned anywhere, use empty string.
+7. Include ingredient quantities when available (e.g., "2 cups flour" not just "flour").
 
-For category, analyze the recipe content to determine the best fit:
-- Use "Breakfast" for morning meals (pancakes, eggs, oatmeal, etc.)
-- Use "Lunch" or "Dinner" for main meals
-- Use "Dessert" for sweet dishes (cakes, cookies, ice cream, etc.)
-- Use "Snacks" for light foods (chips, nuts, popcorn, etc.)
-- Use "Appetizers" for starters (dips, finger foods, etc.)
-- Use "Asian" for dishes from Asian cuisines (Chinese, Japanese, Thai, Indian, etc.)
-- Use "Vegan" if the recipe contains NO animal products
-- Use "Vegetarian" if the recipe contains NO meat/fish but may have dairy/eggs
-
-If multiple categories apply, choose the most specific one. If unsure, use "Dinner" as default.`
+For category:
+- "Breakfast" for morning meals | "Lunch"/"Dinner" for main meals
+- "Dessert" for sweet dishes | "Snacks" for light foods | "Appetizers" for starters
+- "Asian" for Asian cuisines | "Vegan" if no animal products | "Vegetarian" if no meat/fish`
           },
           {
             role: 'user',
-            content: `Extract the recipe from this cooking video transcript:\n\n${transcript}`
+            content: `Extract the recipe from this cooking video information:\n\n${transcript}`
           }
         ],
         temperature: 0.1,
-        max_tokens: 1000,
+        max_tokens: 1500,
         response_format: { type: 'json_object' }
       },
       {

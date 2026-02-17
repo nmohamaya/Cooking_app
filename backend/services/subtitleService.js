@@ -99,18 +99,38 @@ const extractSubtitles = async (url, language = 'en') => {
  * @private
  * @returns {Promise<string|null>} Path to downloaded subtitle file, or null if unavailable
  */
-const downloadSubtitles = (url, outputTemplate, language, jobId) => {
-  return new Promise((resolve, reject) => {
-    // YouTube auto-translated subs use format like "en-sq" (English from Albanian)
-    // Try specific language-language first (e.g. en-en), which avoids downloading many variants
-    // If that doesn't exist, the broader "en" pattern might match manual subs
-    const subLangPattern = `${language}-${language},${language}`;
+const downloadSubtitles = async (url, outputTemplate, language, jobId) => {
+  // Try multiple subtitle language patterns from most specific to broadest
+  // YouTube auto-translated subs use formats like "en-sq" (English from Albanian)
+  const patterns = [
+    `${language}`,                           // Manual subs: "en"
+    `${language}-${language}`,               // Auto-gen same lang: "en-en"
+    `${language}-*`,                         // Auto-translated from any lang: "en-*"
+    `${language}.*`,                         // Any variant: "en.xxx"
+  ];
 
+  for (const pattern of patterns) {
+    logger.debug(`[${jobId}] Trying subtitle pattern: ${pattern}`);
+    const result = await tryDownloadSubtitles(url, outputTemplate, pattern, jobId);
+    if (result) {
+      return result;
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Attempt to download subtitles with a specific language pattern
+ * @private
+ */
+const tryDownloadSubtitles = (url, outputTemplate, langPattern, jobId) => {
+  return new Promise((resolve, reject) => {
     const args = [
       '--js-runtimes', 'node',
       '--write-auto-sub',
       '--write-subs',        // Also try manual subs
-      '--sub-lang', subLangPattern,
+      '--sub-lang', langPattern,
       '--sub-format', 'vtt',
       '--skip-download',
       '--socket-timeout', '30',
@@ -118,7 +138,7 @@ const downloadSubtitles = (url, outputTemplate, language, jobId) => {
       url,
     ];
 
-    logger.debug(`[${jobId}] Running yt-dlp for subtitles`, { args: args.join(' ') });
+    logger.debug(`[${jobId}] Running yt-dlp for subtitles`, { pattern: langPattern });
 
     const ytDlp = spawn('yt-dlp', args);
 
@@ -158,17 +178,18 @@ const downloadSubtitles = (url, outputTemplate, language, jobId) => {
           }
         }
 
-        // No subtitle file found
+        // No subtitle file found - resolve null to try next pattern
         if (stderr.includes('no subtitles') || stderr.includes('There are no subtitles')) {
-          logger.info(`[${jobId}] No subtitles available for this video`);
+          logger.info(`[${jobId}] No subtitles available for pattern: ${langPattern}`);
           resolve(null);
         } else if (code !== 0) {
-          reject(new Error(`yt-dlp failed with code ${code}: ${stderr.substring(0, 200)}`));
+          logger.debug(`[${jobId}] yt-dlp exited with code ${code} for pattern: ${langPattern}`);
+          resolve(null); // Resolve null so pattern loop continues
         } else {
           resolve(null);
         }
       } catch (error) {
-        reject(error);
+        resolve(null); // Don't reject, let pattern loop continue
       }
     });
 
@@ -176,14 +197,15 @@ const downloadSubtitles = (url, outputTemplate, language, jobId) => {
       if (completed) return;
       completed = true;
       clearTimeout(timeout);
-      reject(new Error(`yt-dlp process error: ${error.message}`));
+      logger.debug(`[${jobId}] yt-dlp process error for pattern ${langPattern}: ${error.message}`);
+      resolve(null); // Don't reject, let pattern loop continue
     });
 
     const timeout = setTimeout(() => {
       if (completed) return;
       completed = true;
       ytDlp.kill();
-      reject(new Error('Subtitle extraction timed out after 30 seconds'));
+      resolve(null); // Don't reject on timeout, let pattern loop continue
     }, 30000);
   });
 };

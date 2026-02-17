@@ -319,6 +319,49 @@ router.delete('/:jobId', async (req, res) => {
 });
 
 /**
+ * POST /api/download/metadata
+ * Get video metadata including title and description (fast, no download)
+ */
+router.post('/metadata', async (req, res) => {
+  try {
+    const { url } = req.body;
+
+    if (!url) {
+      return res.status(400).json({
+        error: 'Missing URL',
+        message: 'URL parameter is required'
+      });
+    }
+
+    if (!downloadService.validateUrl(url)) {
+      return res.status(400).json({
+        error: 'Invalid URL',
+        message: 'URL must be from a supported platform'
+      });
+    }
+
+    logger.info(`Metadata requested for: ${url}`);
+
+    const metadata = await downloadService.getVideoMetadata(url);
+
+    return res.json({
+      success: true,
+      title: metadata.title,
+      description: metadata.description,
+      duration: metadata.duration,
+      uploader: metadata.uploader,
+      tags: metadata.tags || []
+    });
+  } catch (error) {
+    logger.error(`Metadata extraction error: ${error.message}`);
+    return res.status(500).json({
+      error: 'Metadata Extraction Failed',
+      message: error.message
+    });
+  }
+});
+
+/**
  * POST /api/download/subtitles
  * Extract subtitles/captions from a video URL (fast path - no download needed)
  * Returns transcript directly without async polling

@@ -273,40 +273,84 @@ const cacheTranscript = async (videoId, language, transcript) => {
 /**
  * Fetch transcript from YouTube API via backend
  * @private
- * Strategy:
- * 1. Try fast path: extract auto-generated subtitles/captions (no download needed)
- * 2. Fall back: download video → extract audio → AI transcription
+ * 3-tier extraction strategy:
+ * 1. Video description (most structured — often has full recipe)
+ * 2. Subtitles/captions (fill gaps and cross-check)
+ * 3. Audio transcription (last resort, if both above fail)
  */
 const fetchTranscriptFromAPI = async (videoId, language) => {
   try {
-    console.log(`🎬 [YouTube] Starting extraction for video: ${videoId}`);
+    console.log(`🎬 [YouTube] Starting 3-tier extraction for video: ${videoId}`);
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-    // === FAST PATH: Try subtitle extraction first ===
-    try {
-      console.log(`📝 [YouTube] Trying subtitle/caption extraction (fast path)...`);
-      const subtitleResponse = await axios.post(
-        `${BACKEND_CONFIG.BASE_URL}/api/download/subtitles`,
-        {
-          url: youtubeUrl,
-          language: language || 'en',
-        },
-        { timeout: 60000 } // 60s should be plenty for subtitle extraction
-      );
+    let description = '';
+    let subtitles = '';
+    let videoTitle = '';
 
-      if (subtitleResponse.data.success && subtitleResponse.data.transcript) {
-        const transcript = subtitleResponse.data.transcript;
-        console.log(`✅ [YouTube] Subtitles extracted successfully (${transcript.length} chars)`);
-        return transcript;
-      }
-    } catch (subtitleError) {
-      // Subtitle extraction failed - this is expected for some videos
-      const errorMsg = subtitleError.response?.data?.error || subtitleError.message;
-      console.log(`⚠️ [YouTube] Subtitle extraction unavailable: ${errorMsg}`);
-      console.log(`🔄 [YouTube] Falling back to download + transcription pipeline...`);
+    // === TIER 1 & 2: Fetch description and subtitles in parallel ===
+    console.log(`📋 [YouTube] Fetching video description and subtitles in parallel...`);
+    
+    const [metadataResult, subtitleResult] = await Promise.allSettled([
+      // Tier 1: Video description
+      axios.post(
+        `${BACKEND_CONFIG.BASE_URL}/api/download/metadata`,
+        { url: youtubeUrl },
+        { timeout: 30000 }
+      ),
+      // Tier 2: Subtitles/captions
+      axios.post(
+        `${BACKEND_CONFIG.BASE_URL}/api/download/subtitles`,
+        { url: youtubeUrl, language: language || 'en' },
+        { timeout: 60000 }
+      ),
+    ]);
+
+    // Process description result
+    if (metadataResult.status === 'fulfilled' && metadataResult.value.data.success) {
+      description = metadataResult.value.data.description || '';
+      videoTitle = metadataResult.value.data.title || '';
+      console.log(`✅ [YouTube] Description obtained (${description.length} chars), title: "${videoTitle}"`);
+    } else {
+      const err = metadataResult.status === 'rejected' 
+        ? metadataResult.reason?.message 
+        : 'No description available';
+      console.log(`⚠️ [YouTube] Description unavailable: ${err}`);
     }
 
-    // === SLOW PATH: Download video → extract audio → transcribe ===
+    // Process subtitle result
+    if (subtitleResult.status === 'fulfilled' && subtitleResult.value.data.success) {
+      subtitles = subtitleResult.value.data.transcript || '';
+      console.log(`✅ [YouTube] Subtitles obtained (${subtitles.length} chars)`);
+    } else {
+      const err = subtitleResult.status === 'rejected'
+        ? subtitleResult.reason?.message
+        : subtitleResult.value?.data?.error || 'No subtitles available';
+      console.log(`⚠️ [YouTube] Subtitles unavailable: ${err}`);
+    }
+
+    // === Build combined transcript from available sources ===
+    if (description || subtitles) {
+      let combined = '';
+      
+      if (videoTitle) {
+        combined += `VIDEO TITLE: ${videoTitle}\n\n`;
+      }
+      
+      if (description) {
+        combined += `VIDEO DESCRIPTION:\n${description}\n\n`;
+      }
+      
+      if (subtitles) {
+        combined += `VIDEO CAPTIONS/SUBTITLES:\n${subtitles}\n`;
+      }
+
+      console.log(`✅ [YouTube] Combined transcript ready (${combined.length} chars from ${description ? 'description' : ''}${description && subtitles ? ' + ' : ''}${subtitles ? 'subtitles' : ''})`);
+      return combined;
+    }
+
+    // === TIER 3: Fall back to download + audio transcription ===
+    console.log(`🔄 [YouTube] No description or subtitles available. Falling back to audio transcription...`);
+    
     console.log(`📥 [YouTube] Starting video download...`);
     const downloadResponse = await axios.post(
       `${BACKEND_CONFIG.BASE_URL}/api/download`,
@@ -364,13 +408,12 @@ const fetchTranscriptFromAPI = async (videoId, language) => {
     );
 
     const transcript = transcribeResult.result?.text;
-    const confidence = transcribeResult.result?.confidence;
     if (!transcript) {
       throw new Error('Transcription completed but no text returned');
     }
-    console.log(`✅ [YouTube] Transcription complete (confidence: ${confidence})`);
+    console.log(`✅ [YouTube] Transcription complete (${transcript.length} chars)`);
 
-    return transcript;
+    return `VIDEO TITLE: ${videoTitle || 'Unknown'}\n\nAUDIO TRANSCRIPTION:\n${transcript}`;
   } catch (error) {
     console.error('❌ [YouTube] Extraction failed:', error.message);
     
@@ -384,7 +427,7 @@ const fetchTranscriptFromAPI = async (videoId, language) => {
     } else if (error.message.includes('403')) {
       throw new Error('Video is private or restricted.');
     } else if (error.message.includes('timeout') || error.message.includes('Timeout')) {
-      throw new Error('Video download or transcription took too long. Try a shorter video.');
+      throw new Error('Video extraction took too long. Try a shorter video.');
     } else if (error.message.includes('ECONNREFUSED')) {
       throw new Error('Cannot connect to backend server. Please ensure the server is running.');
     }
