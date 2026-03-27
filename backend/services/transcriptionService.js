@@ -5,7 +5,7 @@ const { trackCost } = require('./costTracker');
 
 // GitHub Models API configuration (using Copilot account)
 const GITHUB_MODELS_API_URL = 'https://models.inference.ai.azure.com/chat/completions';
-const WHISPER_MODEL = 'gpt-4o-mini'; // Using GPT-4o mini for cost-efficient transcription
+const CLAUDE_MODEL = 'claude-3-5-haiku-20241022'; // Using Claude 3.5 Haiku for cost-efficient transcription
 const COST_PER_MINUTE = 0.0; // Free with Copilot account
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000; // 1 second
@@ -24,7 +24,7 @@ const TRANSCRIPTION_ERROR_CODES = {
 };
 
 /**
- * Transcribe audio file using OpenAI Whisper API
+ * Transcribe audio file using Claude 3.5 Haiku via GitHub Copilot
  * @param {string} audioFilePath - Path to audio file
  * @param {string} audioHash - Hash of audio file (for caching)
  * @param {string} language - Optional language code (e.g., 'en', 'es')
@@ -169,19 +169,19 @@ Include:
 - Any tips or notes mentioned
 Format the transcription clearly with proper punctuation and paragraph breaks.`;
 
-    logger.debug('Sending transcription request to GitHub Models API', {
+    logger.debug('Sending transcription request to GitHub Models API (Claude)', {
       audioFilePath,
       language,
       attempt: retryCount + 1
     });
 
-    // Make API request to GitHub Models using Copilot
+    // Make API request to GitHub Models using Claude Haiku
     const response = await axios.post(GITHUB_MODELS_API_URL, {
-      model: WHISPER_MODEL,
+      model: CLAUDE_MODEL,
       messages: [
         {
           role: 'system',
-          content: 'You are an expert transcription service specializing in recipe videos.'
+          content: 'You are an expert transcription service specializing in recipe videos. Provide accurate, detailed transcriptions with all spoken content including ingredients, cooking steps, times, temperatures, and tips.'
         },
         {
           role: 'user',
@@ -199,7 +199,7 @@ Format the transcription clearly with proper punctuation and paragraph breaks.`;
       timeout: 300000 // 5 minutes timeout
     });
 
-    logger.debug('GitHub Models API response received', {
+    logger.debug('Claude API response received', {
       textLength: response.data.choices[0]?.message?.content?.length || 0
     });
 
@@ -288,12 +288,12 @@ function calculateCost(audioMinutes) {
 
 /**
  * Calculate confidence score for transcription
- * Whisper doesn't provide confidence, so we use heuristics
+ * Claude Haiku provides reliable output, so we use heuristics
  * @private
  */
 function calculateConfidence(transcriptionResult) {
   // Base confidence
-  let confidence = 0.85;
+  let confidence = 0.88;
 
   // Adjust based on text characteristics
   const text = transcriptionResult.text || '';
@@ -337,11 +337,11 @@ async function detectLanguage(audioFilePath) {
     }
 
     const response = await axios.post(GITHUB_MODELS_API_URL, {
-      model: WHISPER_MODEL,
+      model: CLAUDE_MODEL,
       messages: [
         {
           role: 'system',
-          content: 'You are a language detection expert. Analyze the audio content and identify the primary language spoken.'
+          content: 'You are a language detection expert. Identify the primary language spoken in audio content.'
         },
         {
           role: 'user',
