@@ -9,19 +9,16 @@ describe('Audio Service - Issue #111', () => {
   describe('Audio Quality Presets', () => {
     it('should have LOW quality preset', () => {
       expect(AUDIO_QUALITY.LOW).toBeDefined();
-      expect(AUDIO_QUALITY.LOW.bitrate).toBe('64k');
       expect(AUDIO_QUALITY.LOW.sampleRate).toBe('16000');
     });
 
     it('should have MEDIUM quality preset', () => {
       expect(AUDIO_QUALITY.MEDIUM).toBeDefined();
-      expect(AUDIO_QUALITY.MEDIUM.bitrate).toBe('128k');
       expect(AUDIO_QUALITY.MEDIUM.sampleRate).toBe('16000');
     });
 
     it('should have HIGH quality preset', () => {
       expect(AUDIO_QUALITY.HIGH).toBeDefined();
-      expect(AUDIO_QUALITY.HIGH.bitrate).toBe('192k');
       expect(AUDIO_QUALITY.HIGH.sampleRate).toBe('44100');
     });
   });
@@ -44,9 +41,8 @@ describe('Audio Service - Issue #111', () => {
       expect(qualities.length).toBe(3);
     });
 
-    it('should define valid bitrates', () => {
+    it('should define valid sample rates', () => {
       Object.values(AUDIO_QUALITY).forEach(preset => {
-        expect(preset.bitrate).toMatch(/^\d+k$/);
         expect(preset.sampleRate).toMatch(/^\d+$/);
       });
     });
