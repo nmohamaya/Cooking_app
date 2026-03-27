@@ -14,7 +14,7 @@ const {
   setupMonitoring,
   setupCostTracking,
   logDeploymentInfo,
-} = require('./deploymentUtils');
+} = require('../config/deploymentUtils');
 
 jest.mock('../config/logger');
 
