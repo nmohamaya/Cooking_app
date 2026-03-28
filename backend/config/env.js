@@ -26,5 +26,5 @@ module.exports = {
   
   // API
   apiVersion: 'v1',
-  corsOrigin: process.env.CORS_ORIGIN || '*'
+  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:8081'
 };
