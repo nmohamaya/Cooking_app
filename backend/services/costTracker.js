@@ -227,9 +227,36 @@ async function clearCostLogs() {
   }
 }
 
+/**
+ * Get cost alerts — checks current costs against configured limits
+ * @returns {Promise<Object>} Alert status for daily and monthly limits
+ */
+async function getCostAlerts() {
+  const dailyLimit = parseFloat(process.env.COST_DAILY_LIMIT || '50');
+  const monthlyLimit = parseFloat(process.env.COST_MONTHLY_LIMIT || '500');
+  const stats = await getCostStats();
+
+  return {
+    daily: {
+      current: stats.daily,
+      limit: dailyLimit,
+      exceeded: stats.daily > dailyLimit,
+      percentUsed: dailyLimit > 0 ? parseFloat(((stats.daily / dailyLimit) * 100).toFixed(2)) : 0
+    },
+    monthly: {
+      current: stats.monthly,
+      limit: monthlyLimit,
+      exceeded: stats.monthly > monthlyLimit,
+      percentUsed: monthlyLimit > 0 ? parseFloat(((stats.monthly / monthlyLimit) * 100).toFixed(2)) : 0
+    },
+    total: stats.total
+  };
+}
+
 module.exports = {
   trackCost,
   getCostStats,
   getCostLog,
+  getCostAlerts,
   clearCostLogs
 };

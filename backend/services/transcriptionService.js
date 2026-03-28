@@ -1,105 +1,290 @@
-const axios = require('axios');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
-const { getCachedTranscription, setCachedTranscription } = require('./cacheService');
+const { getCachedTranscription, setCachedTranscription, generateAudioHash } = require('./cacheService');
 const { trackCost } = require('./costTracker');
 
-// GitHub Models API configuration (using Copilot account)
-const GITHUB_MODELS_API_URL = 'https://models.inference.ai.azure.com/chat/completions';
-const CLAUDE_MODEL = 'claude-3-5-haiku-20241022'; // Using Claude 3.5 Haiku for cost-efficient transcription
-const COST_PER_MINUTE = 0.0; // Free with Copilot account
+// Configuration
+const COST_PER_MINUTE = 0.0; // Free — subtitles from yt-dlp
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000; // 1 second
+const SUBTITLE_TIMEOUT_MS = 60000; // 60 seconds for yt-dlp subtitle extraction
 
 // Error codes for transcription service
 const TRANSCRIPTION_ERROR_CODES = {
-  INVALID_API_KEY: 'INVALID_API_KEY',
-  API_RATE_LIMIT: 'API_RATE_LIMIT',
+  INVALID_URL: 'INVALID_URL',
+  SUBTITLES_NOT_AVAILABLE: 'SUBTITLES_NOT_AVAILABLE',
   TRANSCRIPTION_FAILED: 'TRANSCRIPTION_FAILED',
   TIMEOUT: 'TIMEOUT',
-  INVALID_AUDIO_FORMAT: 'INVALID_AUDIO_FORMAT',
-  AUDIO_TOO_LONG: 'AUDIO_TOO_LONG',
   PROCESS_ERROR: 'PROCESS_ERROR',
   CACHE_ERROR: 'CACHE_ERROR',
+  YT_DLP_NOT_FOUND: 'YT_DLP_NOT_FOUND',
+  // Keep legacy codes for backward compat
+  INVALID_API_KEY: 'INVALID_API_KEY',
+  API_RATE_LIMIT: 'API_RATE_LIMIT',
+  INVALID_AUDIO_FORMAT: 'INVALID_AUDIO_FORMAT',
+  AUDIO_TOO_LONG: 'AUDIO_TOO_LONG',
   FILE_NOT_FOUND: 'FILE_NOT_FOUND'
 };
 
 /**
- * Transcribe audio file using Claude 3.5 Haiku via GitHub Copilot
- * @param {string} audioFilePath - Path to audio file
- * @param {string} audioHash - Hash of audio file (for caching)
- * @param {string} language - Optional language code (e.g., 'en', 'es')
- * @param {number} audioMinutes - Duration of audio in minutes (for cost calculation)
- * @returns {Promise<{text: string, language: string, cost: number, cached: boolean, confidence: number}>}
+ * Extract subtitles from a video URL using yt-dlp
+ * @param {string} url - Video URL (YouTube, etc.)
+ * @param {string} language - Language code (default: 'en')
+ * @returns {Promise<{text: string, language: string}>}
  */
-async function transcribeAudio(audioFilePath, audioHash, language = null, audioMinutes = 0) {
-  try {
-    logger.info('Starting transcription', {
-      audioFilePath,
-      audioHash,
-      language,
-      audioMinutes
+async function extractSubtitles(url, language = 'en') {
+  const tempId = uuidv4();
+  const tempDir = path.join(__dirname, '..', 'temp', 'subtitles');
+  const tempPath = path.join(tempDir, tempId);
+
+  // Ensure temp directory exists
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  return new Promise((resolve, reject) => {
+    const args = [
+      '--write-sub',
+      '--write-auto-sub',
+      '--sub-lang', language,
+      '--sub-format', 'vtt',
+      '--skip-download',
+      '-o', tempPath,
+      url
+    ];
+
+    logger.debug('Spawning yt-dlp for subtitle extraction', { url, language, args });
+
+    const proc = spawn('yt-dlp', args, { timeout: SUBTITLE_TIMEOUT_MS });
+
+    let stderr = '';
+
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString();
     });
 
+    proc.on('error', (err) => {
+      if (err.code === 'ENOENT') {
+        reject({
+          code: TRANSCRIPTION_ERROR_CODES.YT_DLP_NOT_FOUND,
+          message: 'yt-dlp is not installed. Please install it: https://github.com/yt-dlp/yt-dlp'
+        });
+      } else {
+        reject({
+          code: TRANSCRIPTION_ERROR_CODES.PROCESS_ERROR,
+          message: `yt-dlp process error: ${err.message}`
+        });
+      }
+    });
+
+    proc.on('close', (code) => {
+      // Look for the VTT file — yt-dlp appends language and extension
+      const possibleFiles = [
+        `${tempPath}.${language}.vtt`,
+        `${tempPath}.${language}.auto.vtt`, // auto-generated subs have this pattern sometimes
+      ];
+
+      // Also check for any .vtt file in case naming differs
+      let vttFile = null;
+      for (const file of possibleFiles) {
+        if (fs.existsSync(file)) {
+          vttFile = file;
+          break;
+        }
+      }
+
+      // Fallback: find any VTT file with the tempId prefix
+      if (!vttFile) {
+        try {
+          const files = fs.readdirSync(tempDir);
+          const match = files.find(f => f.startsWith(tempId) && f.endsWith('.vtt'));
+          if (match) {
+            vttFile = path.join(tempDir, match);
+          }
+        } catch (e) {
+          // ignore read errors
+        }
+      }
+
+      if (!vttFile) {
+        // Check stderr for common error patterns
+        if (stderr.includes('Video unavailable') || stderr.includes('Private video')) {
+          reject({
+            code: TRANSCRIPTION_ERROR_CODES.INVALID_URL,
+            message: 'Video is unavailable or private'
+          });
+        } else {
+          reject({
+            code: TRANSCRIPTION_ERROR_CODES.SUBTITLES_NOT_AVAILABLE,
+            message: `No subtitles available for this video in language: ${language}. Try a video with captions enabled.`
+          });
+        }
+        return;
+      }
+
+      try {
+        const vttContent = fs.readFileSync(vttFile, 'utf-8');
+        const text = parseVTT(vttContent);
+
+        // Cleanup temp files
+        cleanupSubtitleFiles(tempDir, tempId);
+
+        if (!text || text.trim().length === 0) {
+          reject({
+            code: TRANSCRIPTION_ERROR_CODES.SUBTITLES_NOT_AVAILABLE,
+            message: 'Subtitles file was empty. Try a different video.'
+          });
+          return;
+        }
+
+        resolve({
+          text: text.trim(),
+          language
+        });
+      } catch (err) {
+        cleanupSubtitleFiles(tempDir, tempId);
+        reject({
+          code: TRANSCRIPTION_ERROR_CODES.PROCESS_ERROR,
+          message: `Failed to parse subtitle file: ${err.message}`
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Parse VTT (WebVTT) subtitle content into plain text
+ * Strips timestamps, headers, and deduplicates overlapping caption lines
+ * @param {string} vttContent - Raw VTT file content
+ * @returns {string} Plain text transcript
+ */
+function parseVTT(vttContent) {
+  if (!vttContent || typeof vttContent !== 'string') {
+    return '';
+  }
+
+  const lines = vttContent.split('\n');
+  const textLines = [];
+  let previousLine = '';
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip empty lines
+    if (!trimmed) continue;
+
+    // Skip WEBVTT header and metadata
+    if (trimmed === 'WEBVTT' || trimmed.startsWith('Kind:') || trimmed.startsWith('Language:')) continue;
+
+    // Skip NOTE blocks
+    if (trimmed.startsWith('NOTE')) continue;
+
+    // Skip timestamp lines (e.g., "00:00:01.000 --> 00:00:04.000")
+    if (/^\d{2}:\d{2}:\d{2}[\.,]\d{3}\s*-->/.test(trimmed)) continue;
+
+    // Skip numeric cue identifiers
+    if (/^\d+$/.test(trimmed)) continue;
+
+    // Strip VTT formatting tags like <c>, </c>, <b>, etc.
+    let cleanLine = trimmed
+      .replace(/<[^>]+>/g, '')  // Remove HTML/VTT tags
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .trim();
+
+    if (!cleanLine) continue;
+
+    // Deduplicate: YouTube auto-captions often repeat lines across overlapping segments
+    if (cleanLine === previousLine) continue;
+
+    textLines.push(cleanLine);
+    previousLine = cleanLine;
+  }
+
+  return textLines.join('\n');
+}
+
+/**
+ * Cleanup subtitle temp files
+ * @private
+ */
+function cleanupSubtitleFiles(tempDir, tempId) {
+  try {
+    const files = fs.readdirSync(tempDir);
+    for (const file of files) {
+      if (file.startsWith(tempId)) {
+        fs.unlinkSync(path.join(tempDir, file));
+      }
+    }
+  } catch (err) {
+    logger.warn('Failed to cleanup subtitle temp files', { error: err.message, tempId });
+  }
+}
+
+/**
+ * Transcribe video by extracting subtitles from URL
+ * This is the main entry point — replaces the old audio-based transcription
+ *
+ * @param {string} url - Video URL to extract subtitles from
+ * @param {string} cacheKey - Cache key (URL hash)
+ * @param {string} language - Language code (default: 'en')
+ * @param {number} audioMinutes - Duration in minutes (for cost tracking, optional)
+ * @returns {Promise<{text: string, language: string, cost: number, cached: boolean, confidence: number}>}
+ */
+async function transcribeAudio(url, cacheKey, language = null, audioMinutes = 0) {
+  try {
+    logger.info('Starting subtitle extraction', { url, cacheKey, language });
+
     // Check cache first
-    const cachedResult = await getCachedTranscription(audioHash);
+    const cachedResult = await getCachedTranscription(cacheKey);
     if (cachedResult) {
-      logger.info('Using cached transcription', { audioHash });
+      logger.info('Using cached transcription', { cacheKey });
       return {
         ...cachedResult,
         cached: true
       };
     }
 
-    // Validate API key
-    const apiKey = process.env.GITHUB_TOKEN;
-    if (!apiKey) {
-      logger.error('GitHub token not configured');
-      throw {
-        code: TRANSCRIPTION_ERROR_CODES.INVALID_API_KEY,
-        message: 'GitHub token not configured. Set GITHUB_TOKEN environment variable.'
-      };
-    }
+    // Extract subtitles with retry logic
+    const subtitleResult = await extractWithRetry(url, language || 'en');
 
-    // Transcribe with retry logic
-    const transcriptionResult = await transcribeWithRetry(
-      audioFilePath,
-      apiKey,
-      language
-    );
-
-    // Calculate cost (free with GitHub Copilot account)
+    // Calculate cost (free — subtitle extraction via yt-dlp)
     const cost = calculateCost(audioMinutes);
 
-    // Track cost (will be $0 with Copilot account)
+    // Track cost
     await trackCost({
       type: 'transcription',
       duration: audioMinutes,
       cost,
-      audioHash,
+      audioHash: cacheKey,
       status: 'success'
     });
 
     // Cache the result
     const result = {
-      text: transcriptionResult.text,
-      language: transcriptionResult.language || language || 'auto-detected',
+      text: subtitleResult.text,
+      language: subtitleResult.language || language || 'en',
       cost,
-      confidence: calculateConfidence(transcriptionResult),
+      confidence: calculateConfidence(subtitleResult),
       timestamp: new Date().toISOString()
     };
 
     try {
-      await setCachedTranscription(audioHash, result);
+      await setCachedTranscription(cacheKey, result);
     } catch (cacheError) {
       logger.warn('Failed to cache transcription', {
         error: cacheError.message,
-        audioHash
+        cacheKey
       });
-      // Don't fail the request if caching fails
     }
 
-    logger.info('Transcription completed successfully', {
-      audioHash,
+    logger.info('Subtitle extraction completed successfully', {
+      cacheKey,
       cost,
       textLength: result.text.length
     });
@@ -109,21 +294,21 @@ async function transcribeAudio(audioFilePath, audioHash, language = null, audioM
       cached: false
     };
   } catch (error) {
-    logger.error('Transcription failed', {
+    logger.error('Subtitle extraction failed', {
       error: error.message,
       code: error.code,
-      audioFilePath,
-      audioHash
+      url,
+      cacheKey
     });
 
-    // Track failed transcription cost (some cost incurred even on failure)
+    // Track failed attempt
     if (audioMinutes > 0) {
       try {
         await trackCost({
           type: 'transcription',
           duration: audioMinutes,
           cost: calculateCost(audioMinutes),
-          audioHash,
+          audioHash: cacheKey,
           status: 'failed'
         });
       } catch (trackingError) {
@@ -138,125 +323,34 @@ async function transcribeAudio(audioFilePath, audioHash, language = null, audioM
 }
 
 /**
- * Transcribe with exponential backoff retry logic
+ * Extract subtitles with exponential backoff retry logic
  * @private
  */
-async function transcribeWithRetry(audioFilePath, apiKey, language, retryCount = 0) {
+async function extractWithRetry(url, language, retryCount = 0) {
   try {
-    const fs = require('fs');
-
-    // Check if file exists
-    if (!fs.existsSync(audioFilePath)) {
-      throw {
-        code: TRANSCRIPTION_ERROR_CODES.FILE_NOT_FOUND,
-        message: `Audio file not found: ${audioFilePath}`
-      };
-    }
-
-    // Read audio file and convert to text prompt for LLM
-    const fileContent = fs.readFileSync(audioFilePath);
-    
-    // Create a prompt for the model to process the audio file
-    // In a production scenario, you'd want to use actual audio transcription
-    // But GitHub Models API with GPT models can process audio context
-    const prompt = `You are a professional transcription service. 
-The audio file contains a recipe video. 
-Please provide a detailed, accurate transcription of all spoken content in the audio.
-Include:
-- All ingredients mentioned
-- All cooking steps
-- Cooking times and temperatures
-- Any tips or notes mentioned
-Format the transcription clearly with proper punctuation and paragraph breaks.`;
-
-    logger.debug('Sending transcription request to GitHub Models API (Claude)', {
-      audioFilePath,
-      language,
-      attempt: retryCount + 1
-    });
-
-    // Make API request to GitHub Models using Claude Haiku
-    const response = await axios.post(GITHUB_MODELS_API_URL, {
-      model: CLAUDE_MODEL,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert transcription service specializing in recipe videos. Provide accurate, detailed transcriptions with all spoken content including ingredients, cooking steps, times, temperatures, and tips.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0, // Deterministic output
-      top_p: 1,
-      max_tokens: 4096
-    }, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 300000 // 5 minutes timeout
-    });
-
-    logger.debug('Claude API response received', {
-      textLength: response.data.choices[0]?.message?.content?.length || 0
-    });
-
-    const transcribedText = response.data.choices[0]?.message?.content || '';
-
-    return {
-      text: transcribedText,
-      language: language || 'auto-detected'
-    };
+    return await extractSubtitles(url, language);
   } catch (error) {
     const isRetryable = isRetryableError(error);
     const shouldRetry = retryCount < MAX_RETRIES && isRetryable;
 
-    logger.warn('Transcription API request failed', {
+    logger.warn('Subtitle extraction failed', {
       error: error.message,
-      code: error.code || error.response?.status,
+      code: error.code,
       attempt: retryCount + 1,
       willRetry: shouldRetry
     });
 
     if (shouldRetry) {
-      // Exponential backoff: 1s, 2s, 4s
       const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
-      logger.info(`Retrying transcription after ${delay}ms`, {
+      logger.info(`Retrying subtitle extraction after ${delay}ms`, {
         attempt: retryCount + 1
       });
-      
+
       await new Promise(resolve => setTimeout(resolve, delay));
-      return transcribeWithRetry(audioFilePath, apiKey, language, retryCount + 1);
+      return extractWithRetry(url, language, retryCount + 1);
     }
 
-    // Determine error code
-    let errorCode = TRANSCRIPTION_ERROR_CODES.TRANSCRIPTION_FAILED;
-    
-    if (error.code === 'ENOENT') {
-      errorCode = TRANSCRIPTION_ERROR_CODES.FILE_NOT_FOUND;
-    } else if (error.response?.status === 401) {
-      errorCode = TRANSCRIPTION_ERROR_CODES.INVALID_API_KEY;
-    } else if (error.response?.status === 429) {
-      errorCode = TRANSCRIPTION_ERROR_CODES.API_RATE_LIMIT;
-    } else if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-      errorCode = TRANSCRIPTION_ERROR_CODES.TIMEOUT;
-    } else if (error.response?.status === 400) {
-      const errorData = error.response?.data;
-      if (errorData?.error?.message?.includes('audio')) {
-        errorCode = TRANSCRIPTION_ERROR_CODES.INVALID_AUDIO_FORMAT;
-      }
-    }
-
-    throw {
-      code: errorCode,
-      message: error.message,
-      details: {
-        status: error.response?.status,
-        apiError: error.response?.data?.error?.message
-      }
-    };
+    throw error;
   }
 }
 
@@ -265,15 +359,14 @@ Format the transcription clearly with proper punctuation and paragraph breaks.`;
  * @private
  */
 function isRetryableError(error) {
-  if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-    return true; // Network timeouts are retryable
-  }
+  // Network/process errors are retryable
+  if (error.code === TRANSCRIPTION_ERROR_CODES.TIMEOUT) return true;
+  if (error.code === TRANSCRIPTION_ERROR_CODES.PROCESS_ERROR) return true;
 
-  const status = error.response?.status;
-  if (status === 429) return true; // Rate limit - retryable
-  if (status === 500) return true; // Server error - retryable
-  if (status === 502) return true; // Bad gateway - retryable
-  if (status === 503) return true; // Service unavailable - retryable
+  // Subtitles not available is NOT retryable
+  if (error.code === TRANSCRIPTION_ERROR_CODES.SUBTITLES_NOT_AVAILABLE) return false;
+  if (error.code === TRANSCRIPTION_ERROR_CODES.INVALID_URL) return false;
+  if (error.code === TRANSCRIPTION_ERROR_CODES.YT_DLP_NOT_FOUND) return false;
 
   return false;
 }
@@ -287,90 +380,78 @@ function calculateCost(audioMinutes) {
 }
 
 /**
- * Calculate confidence score for transcription
- * Claude Haiku provides reliable output, so we use heuristics
+ * Calculate confidence score for subtitle extraction
+ * Real captions are highly reliable
  * @private
  */
-function calculateConfidence(transcriptionResult) {
-  // Base confidence
-  let confidence = 0.88;
+function calculateConfidence(subtitleResult) {
+  let confidence = 0.92; // Higher base confidence than LLM — these are real captions
 
-  // Adjust based on text characteristics
-  const text = transcriptionResult.text || '';
-  
+  const text = subtitleResult.text || '';
+
   // Very short text might be less confident
   if (text.length < 20) {
     confidence -= 0.1;
   }
-  
-  // Very long text might have accumulated errors
+
+  // Very long text is fine — real captions scale well
   if (text.length > 50000) {
-    confidence -= 0.05;
+    confidence -= 0.02;
   }
 
   return Math.min(1.0, Math.max(0.0, confidence));
 }
 
 /**
- * Detect language from audio file (using GitHub Copilot Models)
- * @param {string} audioFilePath - Path to audio file
+ * Detect available subtitle languages for a URL using yt-dlp
+ * @param {string} url - Video URL
  * @returns {Promise<{language: string, confidence: number}>}
  */
-async function detectLanguage(audioFilePath) {
+async function detectLanguage(url) {
   try {
-    logger.info('Detecting language from audio', { audioFilePath });
+    logger.info('Detecting available subtitle languages', { url });
 
-    const fs = require('fs');
-    if (!fs.existsSync(audioFilePath)) {
-      throw {
-        code: TRANSCRIPTION_ERROR_CODES.FILE_NOT_FOUND,
-        message: `Audio file not found: ${audioFilePath}`
-      };
-    }
+    return new Promise((resolve, reject) => {
+      const proc = spawn('yt-dlp', ['--list-subs', '--skip-download', url], {
+        timeout: 30000
+      });
 
-    const apiKey = process.env.GITHUB_TOKEN;
-    if (!apiKey) {
-      throw {
-        code: TRANSCRIPTION_ERROR_CODES.INVALID_API_KEY,
-        message: 'GitHub token not configured'
-      };
-    }
+      let stdout = '';
+      let stderr = '';
 
-    const response = await axios.post(GITHUB_MODELS_API_URL, {
-      model: CLAUDE_MODEL,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a language detection expert. Identify the primary language spoken in audio content.'
-        },
-        {
-          role: 'user',
-          content: 'Based on the audio file provided, what is the primary language spoken? Respond with just the language code (e.g., "en" for English, "es" for Spanish, "fr" for French, etc.)'
+      proc.stdout.on('data', (data) => { stdout += data.toString(); });
+      proc.stderr.on('data', (data) => { stderr += data.toString(); });
+
+      proc.on('error', (err) => {
+        if (err.code === 'ENOENT') {
+          reject({
+            code: TRANSCRIPTION_ERROR_CODES.YT_DLP_NOT_FOUND,
+            message: 'yt-dlp is not installed'
+          });
+        } else {
+          reject({
+            code: TRANSCRIPTION_ERROR_CODES.PROCESS_ERROR,
+            message: `Language detection failed: ${err.message}`
+          });
         }
-      ],
-      temperature: 0,
-      max_tokens: 10
-    }, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 60000 // 1 minute for language detection
+      });
+
+      proc.on('close', () => {
+        // Parse yt-dlp --list-subs output to find available languages
+        // Look for lines like "en   English" or "en-auto  English (auto-generated)"
+        const langMatch = stdout.match(/^([a-z]{2})(?:-auto)?\s+/m);
+        const language = langMatch ? langMatch[1] : 'en';
+
+        resolve({
+          language,
+          confidence: langMatch ? 0.95 : 0.5
+        });
+      });
     });
-
-    const languageText = response.data.choices[0]?.message?.content || 'en';
-    const language = languageText.toLowerCase().trim().substring(0, 2); // Extract 2-letter code
-    
-    logger.info('Language detected', { audioFilePath, language });
-
-    return {
-      language: language || 'en',
-      confidence: 0.95 // GitHub Models language detection is quite accurate
-    };
   } catch (error) {
     logger.error('Language detection failed', {
       error: error.message,
-      audioFilePath
+      url
     });
 
     throw {
@@ -381,9 +462,9 @@ async function detectLanguage(audioFilePath) {
 }
 
 /**
- * Get estimated cost for audio duration
+ * Get estimated cost for transcription
  * @param {number} audioMinutes - Duration in minutes
- * @returns {number} Estimated cost in dollars
+ * @returns {number} Estimated cost in dollars (always 0 for subtitle extraction)
  */
 function getEstimatedCost(audioMinutes) {
   return calculateCost(audioMinutes);
@@ -391,6 +472,8 @@ function getEstimatedCost(audioMinutes) {
 
 module.exports = {
   transcribeAudio,
+  extractSubtitles,
+  parseVTT,
   detectLanguage,
   getEstimatedCost,
   TRANSCRIPTION_ERROR_CODES,

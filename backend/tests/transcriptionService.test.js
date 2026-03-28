@@ -1,468 +1,333 @@
-const { 
-  transcribeAudio, 
-  detectLanguage, 
+const {
+  transcribeAudio,
+  extractSubtitles,
+  parseVTT,
+  detectLanguage,
   getEstimatedCost,
-  TRANSCRIPTION_ERROR_CODES 
+  TRANSCRIPTION_ERROR_CODES
 } = require('../services/transcriptionService');
 
-// Mock GitHub Models API calls
-jest.mock('axios');
-const axios = require('axios');
+// Mock child_process.spawn
+jest.mock('child_process', () => ({
+  spawn: jest.fn()
+}));
+const { spawn } = require('child_process');
 
-// Mock fs so existsSync returns true and readFileSync returns dummy audio data
+// Mock fs
 jest.mock('fs', () => ({
   ...jest.requireActual('fs'),
   existsSync: jest.fn(() => true),
-  readFileSync: jest.fn(() => Buffer.from('fake-audio-data')),
+  readFileSync: jest.fn(() => ''),
+  readdirSync: jest.fn(() => []),
+  mkdirSync: jest.fn(),
+  unlinkSync: jest.fn(),
+}));
+const fs = require('fs');
+
+// Mock cacheService
+jest.mock('../services/cacheService', () => ({
+  getCachedTranscription: jest.fn(() => null),
+  setCachedTranscription: jest.fn(),
+  generateAudioHash: jest.fn((path) => `hash-${path}`),
+  generateUrlHash: jest.fn((url, lang) => `hash-${url}-${lang}`),
+}));
+
+// Mock costTracker
+jest.mock('../services/costTracker', () => ({
+  trackCost: jest.fn(),
 }));
 
 describe('transcriptionService', () => {
+  let mockProcess;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    const fs = require('fs');
+    jest.useFakeTimers({ advanceTimers: true });
+
+    // Default mock process
+    mockProcess = {
+      stdout: { on: jest.fn() },
+      stderr: { on: jest.fn() },
+      on: jest.fn(),
+    };
+    spawn.mockReturnValue(mockProcess);
     fs.existsSync.mockReturnValue(true);
-    fs.readFileSync.mockReturnValue(Buffer.from('fake-audio-data'));
-    process.env.GITHUB_TOKEN = 'test-github-token';
+    fs.readdirSync.mockReturnValue([]);
   });
 
-  describe('transcribeAudio', () => {
-    test('transcribes audio successfully', async () => {
-      // Mock axios response
-      axios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: 'Mix the flour and butter together'
-            }
-          }]
-        }
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  describe('parseVTT', () => {
+    test('parses standard VTT content', () => {
+      const vtt = `WEBVTT
+Kind: captions
+Language: en
+
+00:00:01.000 --> 00:00:04.000
+Welcome to today's recipe
+
+00:00:04.000 --> 00:00:07.000
+We're making chocolate chip cookies
+
+00:00:07.000 --> 00:00:10.000
+You'll need two cups of flour`;
+
+      const result = parseVTT(vtt);
+      expect(result).toContain("Welcome to today's recipe");
+      expect(result).toContain('chocolate chip cookies');
+      expect(result).toContain('two cups of flour');
+      expect(result).not.toContain('WEBVTT');
+      expect(result).not.toContain('-->');
+    });
+
+    test('deduplicates repeated lines from auto-generated captions', () => {
+      const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:03.000
+Hello everyone
+
+00:00:02.000 --> 00:00:04.000
+Hello everyone
+
+00:00:03.000 --> 00:00:06.000
+Today we're cooking pasta`;
+
+      const result = parseVTT(vtt);
+      const lines = result.split('\n').filter(l => l.trim());
+      const helloCount = lines.filter(l => l === 'Hello everyone').length;
+      expect(helloCount).toBe(1);
+    });
+
+    test('strips VTT formatting tags', () => {
+      const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+<c>Add the <b>flour</b> and sugar</c>`;
+
+      const result = parseVTT(vtt);
+      expect(result).toBe('Add the flour and sugar');
+    });
+
+    test('handles empty input', () => {
+      expect(parseVTT('')).toBe('');
+      expect(parseVTT(null)).toBe('');
+      expect(parseVTT(undefined)).toBe('');
+    });
+
+    test('handles VTT with numeric cue identifiers', () => {
+      const vtt = `WEBVTT
+
+1
+00:00:01.000 --> 00:00:04.000
+First line
+
+2
+00:00:04.000 --> 00:00:07.000
+Second line`;
+
+      const result = parseVTT(vtt);
+      expect(result).toContain('First line');
+      expect(result).toContain('Second line');
+    });
+
+    test('handles HTML entities', () => {
+      const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+Salt &amp; pepper`;
+
+      const result = parseVTT(vtt);
+      expect(result).toBe('Salt & pepper');
+    });
+
+    test('skips NOTE blocks', () => {
+      const vtt = `WEBVTT
+
+NOTE This is a comment
+
+00:00:01.000 --> 00:00:04.000
+Actual content`;
+
+      const result = parseVTT(vtt);
+      expect(result).toBe('Actual content');
+      expect(result).not.toContain('NOTE');
+    });
+  });
+
+  describe('extractSubtitles', () => {
+    test('extracts subtitles successfully', async () => {
+      const vttContent = `WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+Mix the flour and butter`;
+
+      // Mock spawn to simulate successful yt-dlp execution
+      spawn.mockImplementation(() => {
+        const proc = {
+          stdout: { on: jest.fn() },
+          stderr: { on: jest.fn() },
+          on: jest.fn(),
+        };
+
+        // Simulate process close with VTT file created
+        setTimeout(() => {
+          const closeHandler = proc.on.mock.calls.find(c => c[0] === 'close')[1];
+          closeHandler(0);
+        }, 10);
+
+        return proc;
       });
 
-      const result = await transcribeAudio(
-        '/tmp/audio.wav',
-        'audio-hash-123',
-        'en',
-        5
-      );
+      // Mock file discovery
+      fs.readdirSync.mockReturnValue(['test-id.en.vtt']);
+      fs.readFileSync.mockReturnValue(vttContent);
 
-      expect(result.text).toBe('Mix the flour and butter together');
+      jest.useRealTimers();
+      const result = await extractSubtitles('https://www.youtube.com/watch?v=test', 'en');
+
+      expect(result.text).toContain('Mix the flour and butter');
       expect(result.language).toBe('en');
-      expect(result.cost).toBeCloseTo(0, 4); // Free with Copilot
-      expect(result.confidence).toBeGreaterThan(0.8);
-      expect(result.cached).toBe(false);
     });
 
-    test('handles language auto-detection', async () => {
-      axios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: 'Mezcla la harina y la mantequilla'
-            }
-          }]
-        }
+    test('handles yt-dlp not installed', async () => {
+      spawn.mockImplementation(() => {
+        const proc = {
+          stdout: { on: jest.fn() },
+          stderr: { on: jest.fn() },
+          on: jest.fn(),
+        };
+
+        setTimeout(() => {
+          const errorHandler = proc.on.mock.calls.find(c => c[0] === 'error')[1];
+          errorHandler({ code: 'ENOENT' });
+        }, 10);
+
+        return proc;
       });
 
-      const result = await transcribeAudio(
-        '/tmp/audio.wav',
-        'audio-hash-456',
-        null, // No language specified
-        3
-      );
-
-      expect(result.language).toBe('auto-detected');
-      expect(result.cost).toBeCloseTo(0, 4); // Free with Copilot
-    });
-
-    test('throws error when API key is missing', async () => {
-      delete process.env.GITHUB_TOKEN;
-
+      jest.useRealTimers();
       await expect(
-        transcribeAudio('/tmp/audio.wav', 'hash', 'en', 5)
+        extractSubtitles('https://www.youtube.com/watch?v=test', 'en')
       ).rejects.toEqual(
         expect.objectContaining({
-          code: TRANSCRIPTION_ERROR_CODES.INVALID_API_KEY,
-          message: expect.stringContaining('GitHub token')
+          code: TRANSCRIPTION_ERROR_CODES.YT_DLP_NOT_FOUND
         })
       );
     });
 
-    test('handles API rate limiting with retry logic', async () => {
-      // First two calls fail with rate limit, third succeeds
-      axios.post
-        .mockRejectedValueOnce({ response: { status: 429 } })
-        .mockRejectedValueOnce({ response: { status: 429 } })
-        .mockResolvedValueOnce({
-          data: {
-            choices: [{
-              message: {
-                content: 'Successful transcription'
-              }
-            }]
-          }
-        });
+    test('handles no subtitles available', async () => {
+      // existsSync: true for temp dir, false for VTT files
+      fs.existsSync.mockImplementation((filePath) => {
+        if (filePath.endsWith('.vtt')) return false;
+        return true; // temp dir exists
+      });
+      fs.readdirSync.mockReturnValue([]); // No VTT files in dir scan
 
-      const result = await transcribeAudio(
-        '/tmp/audio.wav',
-        'hash-rate-limit',
-        'en',
-        2
-      );
+      spawn.mockImplementation(() => {
+        const proc = {
+          stdout: { on: jest.fn() },
+          stderr: { on: jest.fn() },
+          on: jest.fn(),
+        };
 
-      expect(result.text).toBe('Successful transcription');
-      expect(axios.post).toHaveBeenCalledTimes(3); // 2 failures + 1 success
-    });
+        setTimeout(() => {
+          const closeHandler = proc.on.mock.calls.find(c => c[0] === 'close')[1];
+          closeHandler(0);
+        }, 10);
 
-    test('throws error after max retries exceeded', async () => {
-      axios.post.mockRejectedValue({
-        response: { status: 429 },
-        message: 'Rate limited'
+        return proc;
       });
 
+      jest.useRealTimers();
       await expect(
-        transcribeAudio('/tmp/audio.wav', 'hash-fail', 'en', 2)
+        extractSubtitles('https://www.youtube.com/watch?v=nosubs', 'en')
       ).rejects.toEqual(
         expect.objectContaining({
-          code: TRANSCRIPTION_ERROR_CODES.API_RATE_LIMIT
+          code: TRANSCRIPTION_ERROR_CODES.SUBTITLES_NOT_AVAILABLE
         })
       );
-
-      // Initial attempt + 3 retries = 4 total calls
-      expect(axios.post).toHaveBeenCalledTimes(4);
-    });
-
-    test('handles 401 unauthorized error', async () => {
-      axios.post.mockRejectedValueOnce({
-        response: {
-          status: 401,
-          data: { error: { message: 'Invalid API key' } }
-        },
-        message: 'Unauthorized'
-      });
-
-      await expect(
-        transcribeAudio('/tmp/audio.wav', 'hash-401', 'en', 2)
-      ).rejects.toEqual(
-        expect.objectContaining({
-          code: TRANSCRIPTION_ERROR_CODES.INVALID_API_KEY
-        })
-      );
-    });
-
-    test('handles timeout errors', async () => {
-      // Timeout is retryable, so mock all 4 attempts (initial + 3 retries)
-      axios.post.mockRejectedValue({
-        code: 'ECONNABORTED',
-        message: 'Timeout'
-      });
-
-      await expect(
-        transcribeAudio('/tmp/audio.wav', 'hash-timeout', 'en', 60)
-      ).rejects.toEqual(
-        expect.objectContaining({
-          code: TRANSCRIPTION_ERROR_CODES.TIMEOUT
-        })
-      );
-    });
-
-    test('handles invalid audio format error', async () => {
-      axios.post.mockRejectedValueOnce({
-        response: {
-          status: 400,
-          data: { error: { message: 'Invalid audio format' } }
-        },
-        message: 'Bad request'
-      });
-
-      await expect(
-        transcribeAudio('/tmp/audio.mp3', 'hash-invalid', 'en', 2)
-      ).rejects.toEqual(
-        expect.objectContaining({
-          code: TRANSCRIPTION_ERROR_CODES.INVALID_AUDIO_FORMAT
-        })
-      );
-    });
-
-    test('handles file not found error', async () => {
-      const fs = require('fs');
-      fs.existsSync.mockReturnValueOnce(false);
-
-      await expect(
-        transcribeAudio('/nonexistent/audio.wav', 'hash-notfound', 'en', 2)
-      ).rejects.toEqual(
-        expect.objectContaining({
-          message: expect.stringContaining('Audio file not found')
-        })
-      );
-    });
-
-    test('calculates confidence score', async () => {
-      axios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: 'Transcribed text with enough words to be meaningful for scoring purposes'
-            }
-          }]
-        }
-      });
-
-      const result = await transcribeAudio(
-        '/tmp/audio.wav',
-        'hash-confidence',
-        'en',
-        2
-      );
-
-      expect(result.confidence).toBeLessThanOrEqual(1.0);
-      expect(result.confidence).toBeGreaterThanOrEqual(0.0);
-    });
-
-    test('reduces confidence for very short text', async () => {
-      axios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: 'ok'
-            }
-          }]
-        }
-      });
-
-      const result = await transcribeAudio(
-        '/tmp/audio.wav',
-        'hash-short',
-        'en',
-        1
-      );
-
-      expect(result.confidence).toBeLessThan(0.88);
     });
   });
 
-  describe('detectLanguage', () => {
-    test('detects language from audio', async () => {
-      axios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: 'fr'
-            }
-          }]
-        }
+  describe('transcribeAudio (main entry point)', () => {
+    test('returns cached result when available', async () => {
+      const { getCachedTranscription } = require('../services/cacheService');
+      getCachedTranscription.mockResolvedValueOnce({
+        text: 'Cached transcript',
+        language: 'en',
+        cost: 0,
+        confidence: 0.92,
+        timestamp: '2026-01-01T00:00:00.000Z'
       });
 
-      const result = await detectLanguage('/tmp/audio.wav');
-
-      expect(result.language).toBe('fr');
-      expect(result.confidence).toBeCloseTo(0.95);
-    });
-
-    test('throws error when API key missing', async () => {
-      delete process.env.GITHUB_TOKEN;
-
-      await expect(
-        detectLanguage('/tmp/audio.wav')
-      ).rejects.toEqual(
-        expect.objectContaining({
-          code: TRANSCRIPTION_ERROR_CODES.PROCESS_ERROR
-        })
-      );
-    });
-
-    test('handles language detection errors', async () => {
-      axios.post.mockRejectedValueOnce({
-        message: 'Detection failed'
-      });
-
-      await expect(
-        detectLanguage('/tmp/audio.wav')
-      ).rejects.toEqual(
-        expect.objectContaining({
-          code: TRANSCRIPTION_ERROR_CODES.PROCESS_ERROR
-        })
-      );
-    });
-
-    test('handles multiple language formats', async () => {
-      const testCases = [
-        { language: 'en', expected: 'en' },
-        { language: 'es', expected: 'es' },
-        { language: 'fr', expected: 'fr' },
-        { language: 'de', expected: 'de' },
-        { language: 'zh', expected: 'zh' }
-      ];
-
-      for (const testCase of testCases) {
-        axios.post.mockResolvedValueOnce({
-          data: {
-            choices: [{
-              message: {
-                content: testCase.language
-              }
-            }]
-          }
-        });
-
-        const result = await detectLanguage('/tmp/audio.wav');
-        expect(result.language).toBe(testCase.expected);
-      }
-    });
-  });
-
-  describe('Cost Calculation', () => {
-    test('calculates cost correctly (free with Copilot)', async () => {
-      axios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: 'Text'
-            }
-          }]
-        }
-      });
-
+      jest.useRealTimers();
       const result = await transcribeAudio(
-        '/tmp/audio.wav',
-        'hash-cost',
-        'en',
-        10
-      );
-
-      expect(result.cost).toBeCloseTo(0, 4); // Free with Copilot
-    });
-
-    test('handles fractional minute costs', async () => {
-      axios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: 'Text'
-            }
-          }]
-        }
-      });
-
-      const result = await transcribeAudio(
-        '/tmp/audio.wav',
-        'hash-fractional',
-        'en',
-        2.5
-      );
-
-      expect(result.cost).toBeCloseTo(0, 4); // Free with Copilot
-    });
-
-    test('getEstimatedCost returns 0 (free with Copilot)', () => {
-      const cost5min = getEstimatedCost(5);
-      expect(cost5min).toBeCloseTo(0, 4);
-
-      const cost60min = getEstimatedCost(60);
-      expect(cost60min).toBeCloseTo(0, 4);
-    });
-  });
-
-  describe('Error handling', () => {
-    test('tracks cost even on failure', async () => {
-      // Use non-retryable error (400) so it fails immediately
-      axios.post.mockRejectedValueOnce({
-        response: { status: 400, data: { error: { message: 'Bad request' } } },
-        message: 'Bad request'
-      });
-
-      await expect(
-        transcribeAudio('/tmp/audio.wav', 'hash-track', 'en', 3)
-      ).rejects.toEqual(
-        expect.objectContaining({
-          code: TRANSCRIPTION_ERROR_CODES.TRANSCRIPTION_FAILED
-        })
-      );
-
-      // Cost should still be tracked (in real scenario)
-      // This test verifies the error handling flow
-    });
-
-    test('preserves error details', async () => {
-      const errorDetails = 'Specific API error message';
-      axios.post.mockRejectedValueOnce({
-        response: {
-          status: 400,
-          data: { error: { message: errorDetails } }
-        },
-        message: 'Bad request'
-      });
-
-      try {
-        await transcribeAudio('/tmp/audio.wav', 'hash-details', 'en', 2);
-      } catch (error) {
-        expect(error.details).toBeDefined();
-      }
-    });
-  });
-
-  describe('Edge cases', () => {
-    test('handles very long audio (over 1 hour)', async () => {
-      axios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: 'Very long transcription'
-            }
-          }]
-        }
-      });
-
-      const result = await transcribeAudio(
-        '/tmp/long-audio.wav',
-        'hash-long',
-        'en',
-        120
-      );
-
-      expect(result.cost).toBeCloseTo(0, 4); // Free with Copilot
-    });
-
-    test('handles zero duration gracefully', async () => {
-      axios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: 'Text'
-            }
-          }]
-        }
-      });
-
-      const result = await transcribeAudio(
-        '/tmp/audio.wav',
-        'hash-zero',
-        'en',
-        0
-      );
-
-      expect(result.cost).toBe(0);
-    });
-
-    test('handles empty transcription result', async () => {
-      axios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: ''
-            }
-          }]
-        }
-      });
-
-      const result = await transcribeAudio(
-        '/tmp/silent-audio.wav',
-        'hash-empty',
+        'https://www.youtube.com/watch?v=cached',
+        'cache-key',
         'en',
         5
       );
 
-      expect(result.text).toBe('');
-      expect(result.cost).toBeCloseTo(0, 4); // Free with Copilot
+      expect(result.text).toBe('Cached transcript');
+      expect(result.cached).toBe(true);
+    });
+
+    test('getEstimatedCost returns 0 (free with yt-dlp)', () => {
+      expect(getEstimatedCost(5)).toBeCloseTo(0, 4);
+      expect(getEstimatedCost(60)).toBeCloseTo(0, 4);
+    });
+  });
+
+  describe('confidence calculation', () => {
+    test('returns high confidence for normal text', async () => {
+      const { getCachedTranscription } = require('../services/cacheService');
+      getCachedTranscription.mockResolvedValueOnce(null);
+
+      // Mock successful subtitle extraction
+      spawn.mockImplementation(() => {
+        const proc = {
+          stdout: { on: jest.fn() },
+          stderr: { on: jest.fn() },
+          on: jest.fn(),
+        };
+        setTimeout(() => {
+          const closeHandler = proc.on.mock.calls.find(c => c[0] === 'close')[1];
+          closeHandler(0);
+        }, 10);
+        return proc;
+      });
+
+      const longText = `WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+This is a detailed recipe transcript with plenty of content for confidence scoring`;
+
+      fs.readdirSync.mockReturnValue(['test.en.vtt']);
+      fs.readFileSync.mockReturnValue(longText);
+
+      jest.useRealTimers();
+      const result = await transcribeAudio(
+        'https://www.youtube.com/watch?v=conf',
+        'conf-key',
+        'en',
+        5
+      );
+
+      expect(result.confidence).toBeGreaterThanOrEqual(0.82);
+      expect(result.confidence).toBeLessThanOrEqual(1.0);
+    });
+  });
+
+  describe('error codes', () => {
+    test('exports all expected error codes', () => {
+      expect(TRANSCRIPTION_ERROR_CODES.INVALID_URL).toBe('INVALID_URL');
+      expect(TRANSCRIPTION_ERROR_CODES.SUBTITLES_NOT_AVAILABLE).toBe('SUBTITLES_NOT_AVAILABLE');
+      expect(TRANSCRIPTION_ERROR_CODES.TRANSCRIPTION_FAILED).toBe('TRANSCRIPTION_FAILED');
+      expect(TRANSCRIPTION_ERROR_CODES.TIMEOUT).toBe('TIMEOUT');
+      expect(TRANSCRIPTION_ERROR_CODES.PROCESS_ERROR).toBe('PROCESS_ERROR');
+      expect(TRANSCRIPTION_ERROR_CODES.YT_DLP_NOT_FOUND).toBe('YT_DLP_NOT_FOUND');
     });
   });
 });
