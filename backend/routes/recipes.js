@@ -192,12 +192,22 @@ router.put('/:id', (req, res) => {
     }
 
     const updates = req.body;
-    const updatableFields = ['title', 'ingredients', 'instructions', 'prepTime', 'cookTime', 'servings', 'difficulty', 'notes'];
+    const updatableFields = ['title', 'ingredients', 'instructions', 'notes'];
+    const metadataFields = ['prepTime', 'cookTime', 'servings', 'difficulty'];
 
     const recipe = job.result.recipe || job.result;
     for (const field of updatableFields) {
       if (updates[field] !== undefined) {
         recipe[field] = updates[field];
+      }
+    }
+    // Update metadata fields in both top-level and metadata object for consistency
+    for (const field of metadataFields) {
+      if (updates[field] !== undefined) {
+        recipe[field] = updates[field];
+        if (recipe.metadata) {
+          recipe.metadata[field] = updates[field];
+        }
       }
     }
 
@@ -245,16 +255,22 @@ router.delete('/:id', (req, res) => {
       job.status = 'cancelled';
       job.completedAt = new Date().toISOString();
       logger.info('Recipe extraction job cancelled', { id });
+
+      res.json({
+        jobId: id,
+        status: 'cancelled',
+        message: 'Recipe extraction job cancelled successfully'
+      });
     } else {
       recipeJobs.delete(id);
       logger.info('Recipe extraction job removed', { id });
-    }
 
-    res.json({
-      jobId: id,
-      status: 'deleted',
-      message: 'Recipe extraction job removed successfully'
-    });
+      res.json({
+        jobId: id,
+        status: 'deleted',
+        message: 'Recipe extraction job removed successfully'
+      });
+    }
   } catch (error) {
     logger.error('Failed to delete recipe job', {
       error: error.message,
@@ -284,7 +300,13 @@ async function processRecipeJob(jobId, transcribedText, options) {
     // Step 1: Text parsing + ingredient extraction + step extraction
     updateJobStep(job, 'Text Parsing', true);
 
-    const result = extractRecipe(transcribedText, options);
+    // Check for cancellation before starting extraction
+    if (job.status === 'cancelled') return;
+
+    const result = await extractRecipe(transcribedText, options);
+
+    // Check for cancellation after extraction completes
+    if (job.status === 'cancelled') return;
 
     updateJobStep(job, 'Ingredient Extraction', true);
     updateJobStep(job, 'Step Extraction', true);

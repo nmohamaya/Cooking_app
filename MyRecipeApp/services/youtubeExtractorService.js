@@ -354,6 +354,10 @@ const pollTranscriptionJob = async (jobId, maxAttempts = 30, intervalMs = 1000) 
       throw new Error(error?.message || 'Transcription job failed');
     }
 
+    if (status === 'cancelled') {
+      throw new Error(error?.message || 'Transcription job was cancelled');
+    }
+
     // Wait before next poll
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   }

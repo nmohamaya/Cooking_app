@@ -232,8 +232,10 @@ async function clearCostLogs() {
  * @returns {Promise<Object>} Alert status for daily and monthly limits
  */
 async function getCostAlerts() {
-  const dailyLimit = parseFloat(process.env.COST_DAILY_LIMIT || '50');
-  const monthlyLimit = parseFloat(process.env.COST_MONTHLY_LIMIT || '500');
+  const parsedDaily = parseFloat(process.env.COST_DAILY_LIMIT || '50');
+  const parsedMonthly = parseFloat(process.env.COST_MONTHLY_LIMIT || '500');
+  const dailyLimit = Number.isFinite(parsedDaily) && parsedDaily > 0 ? parsedDaily : 50;
+  const monthlyLimit = Number.isFinite(parsedMonthly) && parsedMonthly > 0 ? parsedMonthly : 500;
   const stats = await getCostStats();
 
   return {

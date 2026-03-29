@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
-const { getCachedTranscription, setCachedTranscription, generateAudioHash } = require('./cacheService');
+const { getCachedTranscription, setCachedTranscription } = require('./cacheService');
 const { trackCost } = require('./costTracker');
 
 // Configuration
@@ -58,15 +58,31 @@ async function extractSubtitles(url, language = 'en') {
 
     logger.debug('Spawning yt-dlp for subtitle extraction', { url, language, args });
 
-    const proc = spawn('yt-dlp', args, { timeout: SUBTITLE_TIMEOUT_MS });
+    const proc = spawn('yt-dlp', args);
 
     let stderr = '';
+    let settled = false;
+
+    // Enforce timeout manually since spawn doesn't support timeout option
+    const timeoutId = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        proc.kill('SIGTERM');
+        reject({
+          code: TRANSCRIPTION_ERROR_CODES.TIMEOUT,
+          message: `Subtitle extraction timed out after ${SUBTITLE_TIMEOUT_MS}ms`
+        });
+      }
+    }, SUBTITLE_TIMEOUT_MS);
 
     proc.stderr.on('data', (data) => {
       stderr += data.toString();
     });
 
     proc.on('error', (err) => {
+      clearTimeout(timeoutId);
+      if (settled) return;
+      settled = true;
       if (err.code === 'ENOENT') {
         reject({
           code: TRANSCRIPTION_ERROR_CODES.YT_DLP_NOT_FOUND,
@@ -81,6 +97,29 @@ async function extractSubtitles(url, language = 'en') {
     });
 
     proc.on('close', (code) => {
+      clearTimeout(timeoutId);
+      if (settled) return;
+      settled = true;
+
+      // Handle non-zero exit codes explicitly
+      if (code !== 0 && code !== null) {
+        if (stderr.includes('Video unavailable') || stderr.includes('Private video')) {
+          reject({
+            code: TRANSCRIPTION_ERROR_CODES.INVALID_URL,
+            message: 'Video is unavailable or private'
+          });
+          return;
+        }
+        if (stderr.includes('is not a valid URL') || stderr.includes('Unsupported URL')) {
+          reject({
+            code: TRANSCRIPTION_ERROR_CODES.INVALID_URL,
+            message: `Invalid video URL: ${stderr.trim().split('\n').pop()}`
+          });
+          return;
+        }
+        // Non-zero exit without a VTT file is a process error (retryable)
+        // Fall through to check for VTT file — yt-dlp may still have written subs
+      }
       // Look for the VTT file — yt-dlp appends language and extension
       const possibleFiles = [
         `${tempPath}.${language}.vtt`,
@@ -169,18 +208,28 @@ function parseVTT(vttContent) {
   const lines = vttContent.split('\n');
   const textLines = [];
   let previousLine = '';
+  let inNoteBlock = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
+
+    // NOTE blocks span multiple lines until the next blank line
+    if (trimmed.startsWith('NOTE')) {
+      inNoteBlock = true;
+      continue;
+    }
+    if (inNoteBlock) {
+      if (!trimmed) {
+        inNoteBlock = false;
+      }
+      continue;
+    }
 
     // Skip empty lines
     if (!trimmed) continue;
 
     // Skip WEBVTT header and metadata
     if (trimmed === 'WEBVTT' || trimmed.startsWith('Kind:') || trimmed.startsWith('Language:')) continue;
-
-    // Skip NOTE blocks
-    if (trimmed.startsWith('NOTE')) continue;
 
     // Skip timestamp lines (e.g., "00:00:01.000 --> 00:00:04.000")
     if (/^\d{2}:\d{2}:\d{2}[\.,]\d{3}\s*-->/.test(trimmed)) continue;
@@ -412,17 +461,30 @@ async function detectLanguage(url) {
     logger.info('Detecting available subtitle languages', { url });
 
     return new Promise((resolve, reject) => {
-      const proc = spawn('yt-dlp', ['--list-subs', '--skip-download', url], {
-        timeout: 30000
-      });
+      const proc = spawn('yt-dlp', ['--list-subs', '--skip-download', url]);
 
       let stdout = '';
       let stderr = '';
+      let settled = false;
+
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          proc.kill('SIGTERM');
+          reject({
+            code: TRANSCRIPTION_ERROR_CODES.TIMEOUT,
+            message: 'Language detection timed out after 30s'
+          });
+        }
+      }, 30000);
 
       proc.stdout.on('data', (data) => { stdout += data.toString(); });
       proc.stderr.on('data', (data) => { stderr += data.toString(); });
 
       proc.on('error', (err) => {
+        clearTimeout(timeoutId);
+        if (settled) return;
+        settled = true;
         if (err.code === 'ENOENT') {
           reject({
             code: TRANSCRIPTION_ERROR_CODES.YT_DLP_NOT_FOUND,
@@ -436,7 +498,19 @@ async function detectLanguage(url) {
         }
       });
 
-      proc.on('close', () => {
+      proc.on('close', (code) => {
+        clearTimeout(timeoutId);
+        if (settled) return;
+        settled = true;
+
+        if (code !== 0 && code !== null) {
+          reject({
+            code: TRANSCRIPTION_ERROR_CODES.PROCESS_ERROR,
+            message: `Language detection failed with exit code ${code}: ${stderr.trim()}`
+          });
+          return;
+        }
+
         // Parse yt-dlp --list-subs output to find available languages
         // Look for lines like "en   English" or "en-auto  English (auto-generated)"
         const langMatch = stdout.match(/^([a-z]{2})(?:-auto)?\s+/m);

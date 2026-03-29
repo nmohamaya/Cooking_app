@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
-const { transcribeAudio, detectLanguage, TRANSCRIPTION_ERROR_CODES } = require('../services/transcriptionService');
+const { transcribeAudio, TRANSCRIPTION_ERROR_CODES } = require('../services/transcriptionService');
 const { generateUrlHash } = require('../services/cacheService');
 const { getCostStats, getCostLog } = require('../services/costTracker');
 
@@ -39,6 +39,10 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Validate audioMinutes if provided
+    const validatedMinutes = (typeof audioMinutes === 'number' && isFinite(audioMinutes) && audioMinutes >= 0)
+      ? audioMinutes : 0;
+
     // Check cost estimate (free with subtitle extraction)
     const estimatedCost = 0;
     const costStats = await getCostStats();
@@ -66,7 +70,7 @@ router.post('/', async (req, res) => {
       url: url.trim(),
       cacheKey,
       language: language || null,
-      audioMinutes: audioMinutes || 0,
+      audioMinutes: validatedMinutes,
       status: 'queued',
       progress: 0,
       steps: [
@@ -112,6 +116,55 @@ router.post('/', async (req, res) => {
     res.status(500).json({
       error: 'TRANSCRIPTION_QUEUE_FAILED',
       message: 'Failed to queue transcription job',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/transcribe/costs/stats
+ * Get cost statistics
+ * NOTE: Static routes must be registered BEFORE parameterized /:jobId route
+ */
+router.get('/costs/stats', async (req, res) => {
+  try {
+    const stats = await getCostStats();
+    res.json(stats);
+  } catch (error) {
+    logger.error('Failed to get cost stats', {
+      error: error.message
+    });
+
+    res.status(500).json({
+      error: 'COST_STATS_FAILED',
+      message: 'Failed to retrieve cost statistics',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/transcribe/costs/log
+ * Get detailed cost log
+ */
+router.get('/costs/log', async (req, res) => {
+  try {
+    const parsed = parseInt(req.query.limit || '100', 10);
+    const limit = Number.isNaN(parsed) || parsed <= 0 ? 100 : Math.min(parsed, 1000);
+    const log = await getCostLog(limit);
+
+    res.json({
+      count: log.length,
+      entries: log
+    });
+  } catch (error) {
+    logger.error('Failed to get cost log', {
+      error: error.message
+    });
+
+    res.status(500).json({
+      error: 'COST_LOG_FAILED',
+      message: 'Failed to retrieve cost log',
       details: error.message
     });
   }
@@ -221,53 +274,6 @@ router.delete('/:jobId', (req, res) => {
 });
 
 /**
- * GET /api/transcribe/costs/stats
- * Get cost statistics
- */
-router.get('/costs/stats', async (req, res) => {
-  try {
-    const stats = await getCostStats();
-    res.json(stats);
-  } catch (error) {
-    logger.error('Failed to get cost stats', {
-      error: error.message
-    });
-
-    res.status(500).json({
-      error: 'COST_STATS_FAILED',
-      message: 'Failed to retrieve cost statistics',
-      details: error.message
-    });
-  }
-});
-
-/**
- * GET /api/transcribe/costs/log
- * Get detailed cost log
- */
-router.get('/costs/log', async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit || '100'), 1000);
-    const log = await getCostLog(limit);
-
-    res.json({
-      count: log.length,
-      entries: log
-    });
-  } catch (error) {
-    logger.error('Failed to get cost log', {
-      error: error.message
-    });
-
-    res.status(500).json({
-      error: 'COST_LOG_FAILED',
-      message: 'Failed to retrieve cost log',
-      details: error.message
-    });
-  }
-});
-
-/**
  * Process transcription job asynchronously
  * @private
  */
@@ -279,6 +285,9 @@ async function processTranscriptionJob(jobId) {
     job.status = 'processing';
     job.startedAt = new Date().toISOString();
 
+    // Check for cancellation before starting work
+    if (job.status === 'cancelled') return;
+
     // Step 1: Subtitle extraction (includes language handling)
     logger.debug('Starting subtitle extraction', { jobId, url: job.url });
 
@@ -288,6 +297,9 @@ async function processTranscriptionJob(jobId) {
       job.language,
       job.audioMinutes
     );
+
+    // Check for cancellation after extraction completes
+    if (job.status === 'cancelled') return;
 
     updateJobStep(job, 'Subtitle Extraction', true);
 

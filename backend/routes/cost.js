@@ -37,7 +37,8 @@ router.get('/summary', async (req, res) => {
  */
 router.get('/daily', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit || '100'), 1000);
+    const parsed = parseInt(req.query.limit || '100', 10);
+    const limit = Number.isNaN(parsed) || parsed <= 0 ? 100 : Math.min(parsed, 1000);
     const log = await getCostLog(limit);
 
     // Filter to today's entries

@@ -3,7 +3,7 @@ const express = require('express');
 
 // Mock the recipeExtractionService
 jest.mock('../services/recipeExtractionService', () => ({
-  extractRecipe: jest.fn((text, options) => ({
+  extractRecipe: jest.fn().mockResolvedValue({
     success: true,
     recipe: {
       title: 'Chocolate Chip Cookies',
@@ -20,7 +20,7 @@ jest.mock('../services/recipeExtractionService', () => ({
     confidence: 0.85,
     processingTime: 50,
     error: null
-  }))
+  })
 }));
 
 const recipesRouter = require('../routes/recipes');
@@ -176,16 +176,23 @@ describe('Recipe Routes', () => {
     });
 
     test('returns 400 when job is not completed', async () => {
-      // Create a job but don't wait for completion
+      // Mock extractRecipe to be slow so job stays in processing state
+      const { extractRecipe } = require('../services/recipeExtractionService');
+      extractRecipe.mockImplementationOnce(() => new Promise(resolve => setTimeout(resolve, 5000)));
+
       const createRes = await request(app)
         .post('/api/recipes')
         .send({ transcribedText: 'Mix flour and butter' });
 
-      // Immediately try to update (job may still be processing)
-      // Note: Due to async nature, this might complete too fast
-      // We test the validation logic by checking the route exists
       const { jobId } = createRes.body;
-      expect(jobId).toBeDefined();
+
+      // Immediately try to update while job is still processing
+      const res = await request(app)
+        .put(`/api/recipes/${jobId}`)
+        .send({ title: 'Updated' })
+        .expect(400);
+
+      expect(res.body.error).toBe('JOB_NOT_COMPLETED');
     });
   });
 
@@ -202,7 +209,8 @@ describe('Recipe Routes', () => {
         .delete(`/api/recipes/${jobId}`)
         .expect(200);
 
-      expect(res.body.status).toBe('deleted');
+      // Completed jobs return 'deleted', in-flight jobs return 'cancelled'
+      expect(['deleted', 'cancelled']).toContain(res.body.status);
 
       // Verify it's gone
       await request(app)
