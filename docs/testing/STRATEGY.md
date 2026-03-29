@@ -17,7 +17,7 @@ This document describes MyRecipeApp's testing approach, tooling, and coverage ta
 1. **Test behavior, not implementation** -- use `@testing-library/react-native` patterns (query by text, role, testID; avoid querying by component internals)
 2. **Mock at system boundaries** -- mock AsyncStorage, native modules, and external APIs. Never hit real APIs in tests.
 3. **Every bug gets a regression test** before the fix ships
-4. **Coverage thresholds are enforced** in CI -- tests must pass at 100% rate before merge
+4. **Coverage is tracked in CI** -- we aim to keep coverage high (around 85-90%), and all tests must pass before merge
 
 ## Frontend Tests (MyRecipeApp/)
 
@@ -68,7 +68,7 @@ npm run test:watch    # watch mode
 
 ### Setup
 
-- **Config**: `package.json` Jest section
+- **Config**: `jest.config.js`
 - **Setup file** (`tests/setup.js`): Sets `NODE_ENV=test`, suppresses log output
 - **Timeout**: 10 seconds per test
 - **Flags**: `forceExit: true`, `detectOpenHandles: true`
@@ -105,14 +105,15 @@ Backend coverage is lower because Phase 1 focused on functionality over coverage
 
 ## CI Pipeline
 
-GitHub Actions runs 4 parallel jobs on every push/PR:
+GitHub Actions runs 5 jobs on every push/PR:
 
 1. **Quality** -- ESLint, dependency validation
-2. **Test** -- Jest with coverage
+2. **Test** -- Jest with coverage for `MyRecipeApp/` frontend
 3. **Security** -- `npm audit`
 4. **Build** -- `app.config.js` validation, web build check
+5. **CI status** -- aggregates results from the other 4 jobs
 
-All 4 jobs must pass before merge.
+The Quality, Test, Security, and Build jobs must all pass before merge.
 
 ## Adding New Tests
 

@@ -69,16 +69,16 @@ graph LR
 |-----------|--------------|---------|
 | **helmet** | Default settings | Sets security headers (X-Content-Type-Options, X-Frame-Options, CSP, etc.) |
 | **rateLimit** | 100 requests per 15-minute window, applied to `/api/` prefix only | Prevents API abuse. Configurable via `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX` env vars. |
-| **cors** | Origin from `config.corsOrigin` (defaults to `*`) | Cross-origin request handling. Currently permissive -- must be restricted before production. |
+| **cors** | Origin from `config.corsOrigin` (defaults to `http://localhost:8081`) | Cross-origin request handling. Production deployments must explicitly configure allowed origins. |
 | **express.json** | 10MB body limit | Parses JSON request bodies. |
 | **express.urlencoded** | 10MB limit, extended mode | Parses URL-encoded form data. |
 
 ### Health and Version Endpoints
 
-These are defined directly in `server.js` and are not rate-limited (outside `/api/` prefix):
+These are defined directly in `server.js`. `/health` is outside the `/api/` prefix and is not rate-limited, while `/api/version` is subject to the API rate limiter:
 
-- `GET /health` -- returns status, timestamp, environment, and uptime
-- `GET /api/version` -- returns version `1.0.0`, API `v1`, and supported features
+- `GET /health` -- returns status, timestamp, environment, and uptime (not rate-limited)
+- `GET /api/version` -- returns version `1.0.0`, API `v1`, and supported features (rate-limited)
 
 ## API Data Flow: Video URL to Structured Recipe
 

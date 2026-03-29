@@ -49,7 +49,7 @@ graph LR
         YTDLP["yt-dlp\n\nSubtitle extraction\nVideo download"]
     end
 
-    FE -->|"HTTP/JSON\nport 3000"| API
+    FE -->|"HTTP/JSON\nport 3001 (default)"| API
     API -->|"child_process spawn"| YTDLP
     YTDLP -->|"HTTP/HTTPS"| VP
     API -->|"Read/Write"| FS
@@ -139,7 +139,7 @@ All user data is persisted on-device using AsyncStorage with these keys:
 | Key | Data |
 |-----|------|
 | `recipes` | Array of recipe objects |
-| `mealPlan_YYYY-WW` | Weekly meal plan assignments |
+| `@myrecipeapp/meal_plan` | Weekly meal plan assignments (also written to `mealPlan` for backward compat) |
 | `shoppingList` | Current shopping list items |
 | `cookingTimers` | Active timer state |
 | `extractionHistory` | Last 10 extraction URLs |

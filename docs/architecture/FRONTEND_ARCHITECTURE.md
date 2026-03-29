@@ -164,7 +164,7 @@ graph TB
 
     subgraph AsyncStorage
         ASR["'recipes' -> JSON"]
-        ASMP["'mealPlan_YYYY-WW' -> JSON"]
+        ASMP["'@myrecipeapp/meal_plan' -> JSON"]
         ASSL["'shoppingList' -> JSON"]
         AST["'cookingTimers' -> JSON"]
         ASEH["'extractionHistory' -> JSON"]
