@@ -102,21 +102,12 @@ describe('Server Setup - Issue #110', () => {
       expect(res.headers['ratelimit-limit']).toBeUndefined();
     });
 
-    it('should return 429 when rate limit is exceeded', async () => {
-      // Save original env
-      const originalMax = process.env.RATE_LIMIT_MAX;
-
-      // This test verifies the rate limit message format
-      // We can't easily trigger 429 in supertest without making many requests,
-      // but we verify the limiter is configured correctly via headers
+    it('should expose rate limit configuration via headers', async () => {
       const res = await request(app)
         .get('/api/version')
         .expect(200);
 
       expect(parseInt(res.headers['ratelimit-limit'])).toBeGreaterThan(0);
-
-      // Restore env
-      process.env.RATE_LIMIT_MAX = originalMax;
     });
   });
 

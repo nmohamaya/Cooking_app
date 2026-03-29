@@ -15,9 +15,19 @@ const app = express();
 app.use(helmet());
 
 // Rate limiting for API routes
+const parseRateLimitEnv = (envValue, defaultValue) => {
+  if (envValue === undefined) return defaultValue;
+  const parsed = parseInt(envValue, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    logger.warn(`Invalid rate limit env value "${envValue}", using default ${defaultValue}`);
+    return defaultValue;
+  }
+  return parsed;
+};
+
 const apiLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || String(15 * 60 * 1000)), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX || '100'),
+  windowMs: parseRateLimitEnv(process.env.RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000), // 15 minutes
+  max: parseRateLimitEnv(process.env.RATE_LIMIT_MAX, 100),
   standardHeaders: true,
   legacyHeaders: false,
   message: {
