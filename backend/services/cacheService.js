@@ -23,6 +23,20 @@ function generateAudioHash(audioFilePath) {
 }
 
 /**
+ * Generate hash for URL + language (for cache key)
+ * Used by subtitle-based transcription
+ * @param {string} url - Video URL
+ * @param {string} language - Language code
+ * @returns {string} Hash of URL + language
+ */
+function generateUrlHash(url, language = 'en') {
+  return crypto
+    .createHash('sha256')
+    .update(`${url}:${language}`)
+    .digest('hex');
+}
+
+/**
  * Get cached transcription result
  * @param {string} audioHash - Hash of audio file
  * @returns {Promise<?Object>} Cached transcription or null if not found/expired
@@ -210,6 +224,7 @@ function getCacheStats() {
 
 module.exports = {
   generateAudioHash,
+  generateUrlHash,
   getCachedTranscription,
   setCachedTranscription,
   clearCacheEntry,

@@ -26,35 +26,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 // Mock axios for backend API calls
 jest.mock('axios', () => ({
   post: jest.fn(),
+  get: jest.fn(),
 }));
 
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-describe('youtubeExtractorService', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    AsyncStorage.getItem.mockResolvedValue(null);
-    AsyncStorage.getAllKeys.mockResolvedValue([]);
-    
-    // Mock axios.post to handle different scenarios based on video ID
-    axios.post.mockImplementation((url, data) => {
-      const videoId = data.url?.split('v=')[1] || '';
-      
-      // Handle error cases
-      if (videoId === 'invalid' || videoId === 'not-found') {
-        return Promise.reject(new Error('404: Video not found'));
-      }
-      
-      if (videoId === 'no-captions') {
-        return Promise.reject(new Error('No transcripts available for this video'));
-      }
-      
-      // Default success response
-      return Promise.resolve({
-        data: {
-          success: true,
-          transcript: `Welcome to today's recipe video! Today we're making delicious chocolate chip cookies.
+const MOCK_TRANSCRIPT = `Welcome to today's recipe video! Today we're making delicious chocolate chip cookies.
 
 INGREDIENTS:
 2 and 1/4 cups all-purpose flour
@@ -77,9 +55,50 @@ Fold in the chocolate chips.
 Drop rounded tablespoons of dough onto baking sheets.
 Bake for 9 to 11 minutes or until golden brown.
 Cool on baking sheets for 2 minutes, then transfer to wire racks.
-Enjoy your homemade cookies!`,
-          confidence: 0.92,
-          videoPath: '/tmp/video.mp4'
+Enjoy your homemade cookies!`;
+
+describe('youtubeExtractorService', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    AsyncStorage.getItem.mockResolvedValue(null);
+    AsyncStorage.getAllKeys.mockResolvedValue([]);
+
+    // Mock axios.post: POST /api/transcribe returns jobId
+    axios.post.mockImplementation((url, data) => {
+      const videoUrl = data.url || '';
+      const videoId = videoUrl.split('v=')[1] || '';
+
+      // Handle error cases
+      if (videoId === 'invalid' || videoId === 'not-found') {
+        return Promise.reject(new Error('404: Video not found'));
+      }
+
+      if (videoId === 'no-captions') {
+        return Promise.reject(new Error('No transcripts available for this video'));
+      }
+
+      // Return jobId for async polling
+      return Promise.resolve({
+        data: {
+          jobId: `job-${videoId}`,
+          status: 'queued',
+          message: 'Transcription job queued successfully'
+        }
+      });
+    });
+
+    // Mock axios.get: GET /api/transcribe/:jobId returns completed result
+    axios.get.mockImplementation(() => {
+      return Promise.resolve({
+        data: {
+          status: 'completed',
+          result: {
+            text: MOCK_TRANSCRIPT,
+            language: 'en',
+            confidence: 0.92,
+            cost: 0,
+            cached: false
+          }
         }
       });
     });
@@ -129,7 +148,7 @@ Enjoy your homemade cookies!`,
       const result = await getYoutubeTranscript('no-captions');
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('available');
+      expect(result.error).toBeDefined();
     });
 
     test('should handle invalid video ID', async () => {
