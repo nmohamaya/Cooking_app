@@ -11,7 +11,7 @@ Local development setup for the MyRecipeApp backend.
 | Software | Minimum Version | Installation |
 |----------|----------------|--------------|
 | Node.js | 18.0.0 | [nodejs.org](https://nodejs.org/) |
-| npm | 8.x | Included with Node.js |
+| npm | 9.0.0+ | Included with Node.js |
 | FFmpeg | 4.0+ | See platform instructions below |
 | yt-dlp | Latest | See platform instructions below |
 | Git | Any recent | [git-scm.com](https://git-scm.com/) |
@@ -84,7 +84,7 @@ yt-dlp --version
 Create `backend/.env`:
 
 ```bash
-cp backend/.env.example backend/.env
+cp .env.example .env
 ```
 
 Edit with your values:
@@ -200,7 +200,7 @@ cd backend
 npm run lint
 ```
 
-The backend uses ESLint with `eslint-plugin-security` enabled.
+The backend uses ESLint for code quality checks.
 
 ---
 
