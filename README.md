@@ -110,63 +110,18 @@ Cooking_app/
 
 ## 📚 Documentation
 
-### Completed Features & Issue Resolution
+See **[docs/INDEX.md](docs/INDEX.md)** for the full documentation index.
 
-For detailed documentation on completed meal planning integration, including all issues encountered and solutions:
-
-- **[ISSUE_100_DEVELOPMENT_LOG.md](./ISSUE_100_DEVELOPMENT_LOG.md)** - Complete development log with:
-  - 10 issues encountered and their root causes
-  - Step-by-step solutions with code examples
-  - Architecture decisions and patterns
-  - Testing & validation results
-  - Key learnings for future developers
-  - GitHub Issue #100 implementation details
-
-### Quick Reference
-
-**Current Work - Backend Deployment (Issue #115)**
-- **PR:** [#144](https://github.com/nmohamaya/Cooking_app/pull/144) - Backend Deployment & Cost Monitoring (✅ MERGED)
-- **All 14 Review Comments**: ✅ Addressed
-- **Security Vulnerability**: ✅ Resolved (tar package GHSA-8qq5-rm4j-mr97)
-- **Status:** ✅ COMPLETE - Ready for Production Deployment
-
-**Previous - Video Transcription Feature (Issue #20)**
-- **PR:** [#124](https://github.com/nmohamaya/Cooking_app/pull/124) - Phases 3 & 4 Implementation
-- **Status:** ✅ Complete (all tests passing)
-
-**Previous Work - Meal Planning Integration**
-- **PR:** [#101](https://github.com/nmohamaya/Cooking_app/pull/101) - Meal Plan Integration
-- **Test Issue:** [#102](https://github.com/nmohamaya/Cooking_app/issues/102) - Manual Testing Checklist
-- **Status:** ✅ Complete (532/532 tests passing)
-
----
-
-**Phase 1: Quality & Stability (2 weeks)**
-
-- Fix 4 critical bugs (Android import, web rendering, shopping list)
-- Fix test infrastructure
-- Complete all manual testing
-- Outcome: Stable, production-ready app
-
-**Phase 2: Feature Completion (2 weeks)**
-
-- Implement search & filters (Issue #16)
-- Add categories & tags (Issue #17)
-- Add duplicate detection (Issue #32)
-- Implement shopping list generator (Issue #15)
-- Fix Issue #36 (Android JSON import)
-- Issue #44 (Feedback modal testing)
-- Issue #41 (Multi-timer testing)
-- Issue #42 (Test infrastructure)
-- Outcome: Feature-complete MVP
-
-**Phase 3: Launch Preparation (1 week)**
-
-- App signing, Play Store graphics
-- Multi-device testing
-- Privacy policy, release notes
-
-**Outcome: Ready to submit to Play Store**
+| Area | Document |
+| --- | --- |
+| Architecture | [docs/architecture/OVERVIEW.md](docs/architecture/OVERVIEW.md) |
+| API Reference | [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md) |
+| Deployment | [docs/guides/DEPLOYMENT.md](docs/guides/DEPLOYMENT.md) |
+| Design System | [docs/design/DESIGN_SYSTEM.md](docs/design/DESIGN_SYSTEM.md) |
+| Test Strategy | [docs/testing/STRATEGY.md](docs/testing/STRATEGY.md) |
+| ADRs | [docs/adr/README.md](docs/adr/README.md) |
+| Roadmap | [docs/ROADMAP.md](docs/ROADMAP.md) |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
 
 ---
 
