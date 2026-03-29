@@ -40,7 +40,7 @@ The workflow includes:
 ### ⚠️ CRITICAL - Verify PR Functionality (Step 5)
 **This prevents shipping broken code. All PRs require:**
 - [ ] `npx expo install --check` passes (all dependencies aligned)
-- [ ] `npm test` passes (1126+ tests, 88.93%+ coverage)
+- [ ] `npm test` passes (1126+ tests, 90%+ coverage)
 - [ ] `npm run security` passes (0 vulnerabilities)
 - [ ] Platform builds succeed (EAS build or web build)
 - [ ] Build logs reviewed for warnings/errors
