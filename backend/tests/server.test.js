@@ -45,8 +45,69 @@ describe('Server Setup - Issue #110', () => {
       const res = await request(app)
         .get('/health')
         .expect(200);
-      
+
       expect(res.headers['access-control-allow-origin']).toBeDefined();
+    });
+  });
+
+  describe('Security Headers (helmet)', () => {
+    it('should include X-Content-Type-Options header', async () => {
+      const res = await request(app)
+        .get('/health')
+        .expect(200);
+
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+    });
+
+    it('should include X-Frame-Options header', async () => {
+      const res = await request(app)
+        .get('/health')
+        .expect(200);
+
+      expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
+    });
+
+    it('should include Strict-Transport-Security header', async () => {
+      const res = await request(app)
+        .get('/health')
+        .expect(200);
+
+      expect(res.headers['strict-transport-security']).toBeDefined();
+    });
+
+    it('should not expose X-Powered-By header', async () => {
+      const res = await request(app)
+        .get('/health')
+        .expect(200);
+
+      expect(res.headers['x-powered-by']).toBeUndefined();
+    });
+  });
+
+  describe('Rate Limiting', () => {
+    it('should include rate limit headers on API routes', async () => {
+      const res = await request(app)
+        .get('/api/version')
+        .expect(200);
+
+      expect(res.headers['ratelimit-limit']).toBeDefined();
+      expect(res.headers['ratelimit-remaining']).toBeDefined();
+    });
+
+    it('should not apply rate limiting to non-API routes', async () => {
+      const res = await request(app)
+        .get('/health')
+        .expect(200);
+
+      expect(res.headers['ratelimit-limit']).toBeUndefined();
+    });
+
+    it('should expose rate limit configuration via headers', async () => {
+      const res = await request(app)
+        .get('/api/version')
+        .expect(200);
+
+      expect(parseInt(res.headers['ratelimit-limit'])).toBeGreaterThan(0);
     });
   });
 

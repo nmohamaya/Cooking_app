@@ -3,11 +3,39 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const logger = require('./config/logger');
 const config = require('./config/env');
 
 // Initialize Express app
 const app = express();
+
+// Security headers
+app.use(helmet());
+
+// Rate limiting for API routes
+const parseRateLimitEnv = (envValue, defaultValue) => {
+  if (envValue === undefined) return defaultValue;
+  const parsed = parseInt(envValue, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    logger.warn(`Invalid rate limit env value "${envValue}", using default ${defaultValue}`);
+    return defaultValue;
+  }
+  return parsed;
+};
+
+const apiLimiter = rateLimit({
+  windowMs: parseRateLimitEnv(process.env.RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000), // 15 minutes
+  max: parseRateLimitEnv(process.env.RATE_LIMIT_MAX, 100),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'TOO_MANY_REQUESTS',
+    message: 'Rate limit exceeded. Try again later.'
+  }
+});
+app.use('/api/', apiLimiter);
 
 // Middleware
 app.use(cors({ origin: config.corsOrigin }));
