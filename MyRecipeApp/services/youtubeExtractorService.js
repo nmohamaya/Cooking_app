@@ -17,6 +17,7 @@ import axios from 'axios';
 const CACHE_CONFIG = {
   TTL_MS: 60 * 60 * 1000, // 1 hour in milliseconds
   KEY_PREFIX: 'youtube_transcript_',
+  VERSION: 2, // Increment to invalidate all old cache entries (v1 had mock data bug)
 };
 
 /**
@@ -237,6 +238,12 @@ const getCachedTranscript = async (videoId, language) => {
     const data = JSON.parse(cached);
     const now = Date.now();
 
+    // Invalidate cache entries from older versions (e.g., mock data bug in v1)
+    if (!data.version || data.version < CACHE_CONFIG.VERSION) {
+      await AsyncStorage.removeItem(key);
+      return null;
+    }
+
     // Check if cache has expired
     if (data.expiresAt && now > data.expiresAt) {
       await AsyncStorage.removeItem(key);
@@ -261,6 +268,7 @@ const cacheTranscript = async (videoId, language, transcript) => {
       transcript,
       language,
       videoId,
+      version: CACHE_CONFIG.VERSION,
       cachedAt: Date.now(),
       expiresAt: Date.now() + CACHE_CONFIG.TTL_MS,
     };
