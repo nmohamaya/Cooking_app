@@ -1,7 +1,7 @@
 # 🍳 MyRecipeApp - AI-Powered Recipe Management Platform
 
 > **Created, Updated, and Maintained by AI Agents** 🤖
-> 
+>
 > This project demonstrates advanced AI-driven development practices with continuous integration, intelligent code reviews, and automated testing.
 
 ## 📋 Project Overview
@@ -21,90 +21,154 @@
 
 ### 📊 Project Statistics
 
-- **1126+ Tests** (100% passing)
+- **1,126+ Tests** (100% passing)
 - **88.93% Code Coverage**
 - **0 Security Vulnerabilities**
-- **React Native + Expo SDK 54**
-- **NativeBase v3 UI Components**
-- **Cross-Platform**: iOS, Android, Web
+- **React Native 0.81.5 + Expo SDK 54**
+- **Node.js + Express Backend**
+- **Cross-Platform**: Android, Web (iOS planned)
 
 ---
 
 ## 🚀 Quick Start
 
-### Installation
+### Prerequisites
+
+- **Node.js** >= 18.0.0 and **npm** >= 9.0.0
+- **yt-dlp** — for YouTube subtitle extraction (`pip install yt-dlp` or [install guide](https://github.com/yt-dlp/yt-dlp#installation))
+- **FFmpeg** — for audio processing (`sudo apt install ffmpeg` on Ubuntu, `brew install ffmpeg` on macOS)
+- **GitHub Token** — required for AI features (Claude 3.5 Haiku via GitHub Models API)
+
+### 1. Backend Setup
 
 ```bash
-# Navigate to the app directory
+cd backend
+
+# Install dependencies
+npm ci
+
+# Create environment file
+cp .env.example .env   # Then edit .env and add your GITHUB_TOKEN
+
+# Start development server (auto-reload on changes)
+npm run dev             # Runs on http://localhost:3000
+```
+
+**Required environment variables** (see `backend/.env.example`):
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `GITHUB_TOKEN` | Yes | GitHub token for AI model access |
+| `PORT` | No | Server port (default: 3000) |
+| `CORS_ORIGIN` | No | Allowed origins (default: `http://localhost:8081`) |
+| `COST_TRACKING_ENABLED` | No | Enable AI cost tracking (default: false) |
+
+Verify the backend is running:
+
+```bash
+curl http://localhost:3000/health        # Should return health status
+curl http://localhost:3000/api/version   # Should return API version
+```
+
+### 2. Frontend Setup
+
+```bash
 cd MyRecipeApp
 
 # Install dependencies
-npm install
+npm ci
 
-# Or use Expo CLI
-npx expo install
+# Start Expo development server
+npm start              # Opens Expo DevTools
+
+# Or start directly for a specific platform:
+npm run web            # Web browser
+npm run android        # Android emulator
+npm run ios            # iOS simulator (macOS only)
 ```
 
-### Running the App
+> **Note:** The frontend connects to the backend at `http://localhost:3000` by default (configured in `MyRecipeApp/services/apiClient.js`).
 
-**Development Mode:**
+### 3. Running Tests
+
 ```bash
-# Web
-npm run web
+# Frontend tests (from MyRecipeApp/)
+cd MyRecipeApp
+npm test               # Runs all tests with coverage
 
-# iOS (macOS only)
-npm run ios
-
-# Android
-npm run android
+# Backend tests (from backend/)
+cd backend
+npm test               # Runs all tests with coverage
 ```
 
-**Build for Production:**
+### 4. Security & Dependency Checks
+
 ```bash
-# EAS Build for iOS and Android
-eas build --platform ios
-eas build --platform android
+# Run in both MyRecipeApp/ and backend/
+npm run security                    # npm audit
+
+# Frontend only — verify Expo dependency alignment
+cd MyRecipeApp
+npx expo install --check            # Critical before any merge
 ```
 
-### Running Tests
+### Build for Production
 
 ```bash
-# Run all tests
-npm test
+# Android/iOS via EAS Build
+cd MyRecipeApp
+npx eas build --platform android
+npx eas build --platform ios
 
-# Run with coverage
-npm test -- --coverage
-
-# Watch mode
-npm test -- --watch
+# Backend deployment
+bash deploy.sh                      # Automated validation + deployment
 ```
 
 ---
 
 ## 📁 Project Structure
 
-```
+```text
 Cooking_app/
-├── MyRecipeApp/                    # Main app directory
-│   ├── App.js                     # Root component
-│   ├── app.json                   # App configuration
-│   ├── package.json               # Dependencies
-│   ├── eas.json                   # EAS Build config
-│   └── __tests__/                 # Test suites
-├── docs/                          # Documentation
-│   ├── FIGMA_DESIGN_SYSTEM.md    # Design specifications
-│   ├── UI_REDESIGN_EPIC_GUIDE.md # Redesign roadmap
-│   └── ...                        # Additional guides
+├── MyRecipeApp/                    # React Native + Expo frontend
+│   ├── App.js                     # Root component (navigation, state)
+│   ├── screens/                   # 8 screens (Home, AddRecipe, MealPlan, etc.)
+│   ├── components/                # Reusable UI components
+│   ├── services/                  # API client, extractors, business logic
+│   ├── contexts/                  # React contexts for state management
+│   ├── __tests__/                 # Frontend test suites
+│   └── app.config.js              # Expo configuration
+├── backend/                       # Node.js + Express API server
+│   ├── server.js                  # Express app entry point
+│   ├── routes/                    # API routes (download, transcribe, recipes, cost)
+│   ├── services/                  # Business logic services
+│   ├── config/                    # Environment, logger, deployment config
+│   └── tests/                     # Backend test suites
+├── docs/                          # Organized documentation
+│   ├── INDEX.md                   # Documentation entry point
+│   ├── ROADMAP.md                 # Living roadmap to Play Store launch
+│   ├── adr/                       # Architecture Decision Records
+│   ├── architecture/              # C4 diagrams, system overview
+│   ├── api/                       # API reference
+│   ├── guides/                    # Setup, deployment, video extraction guides
+│   ├── design/                    # Design system, UI redesign plan
+│   ├── testing/                   # Test strategy, QA checklists
+│   └── archive/                   # Historical phase/issue records
+├── scripts/                       # Deployment and utility scripts
+├── .github/workflows/ci.yml       # GitHub Actions CI/CD pipeline
 ├── README.md                      # This file
 ├── CONTRIBUTING.md                # Contributing guidelines
-├── FIGMA_DESIGN_SYSTEM.md        # UI/UX specifications
-└── DEPLOYMENT_GUIDE.md           # Deployment instructions
+├── SECURITY.md                    # Security policy
+├── CODE_OF_CONDUCT.md             # Contributor Covenant v2.1
+├── CHANGELOG.md                   # Release history
+└── LICENSE                        # MIT License
 ```
 
 ---
 
 ## 📱 Launch Roadmap Summary
-3-Phase Plan to Play Store (Target: Jan 28, 2026)
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the full roadmap to Google Play Store launch.
 
 ---
 
@@ -132,7 +196,9 @@ This project follows a structured development process designed to catch issues e
 ### 🔄 Complete Development Workflow
 
 #### Step 1: Issue Management & Planning
+
 Before starting any work:
+
 1. **Create an Issue** (required)
    - Title format: `[Type] Feature/fix description`
    - Add detailed description, acceptance criteria, and expected behavior
@@ -143,26 +209,31 @@ Before starting any work:
    - Set in GitHub Projects board for team visibility
 
 #### Step 2: Create a Feature Branch
+
 ```bash
 git checkout -b feature/issue-XX-short-description
 ```
 
 **Branch Naming Convention:**
+
 - Feature: `feature/issue-XX-description`
 - Bug fix: `fix/issue-XX-description`
 - Documentation: `docs/issue-XX-description`
 
 #### Step 3: Implement Changes
+
 - Write code following project conventions
 - Commit frequently with clear messages
 - Reference issue numbers: `fix(#99): description`
-- Run pre-commit checks pass:
+- Run pre-commit checks:
+
   ```bash
   npm test           # All tests must pass
   npm run security   # 0 vulnerabilities
   ```
 
 #### Step 4: Create Pull Request
+
 1. Push branch: `git push origin feature/issue-XX-description`
 2. Create PR with:
    - Clear title: `fix(#XX): description`
@@ -175,75 +246,93 @@ git checkout -b feature/issue-XX-short-description
 5. Ensure CI/CD checks pass
 
 #### Step 5: ✨ CRITICAL - Verify PR Functionality
+
 **This step prevents shipping broken code. All PRs must pass these checks before merging:**
 
 ##### 5a. Dependency Verification
+
 ```bash
 cd MyRecipeApp
 npx expo install --check
 ```
+
 **Purpose**: Catches missing peer dependencies and version mismatches
+
 - Validates all packages match Expo SDK expectations
 - Detects missing native module dependencies (like `react-native-gesture-handler`)
 - Prevents app crashes in production
 
 **Real Example (Issue #99)**: Testing discovered:
+
 - Missing: `react-native-gesture-handler` → would cause app crash
 - Mismatch: `react-native-screens` (3.35.0 vs ~4.16.0)
 - Mismatch: `jest` (30.2.0 vs ~29.7.0)
 
 ##### 5b. Test Suite & Security
+
 ```bash
-npm test
-npm run security
+npm test                  # In both MyRecipeApp/ and backend/
+npm run security          # In both MyRecipeApp/ and backend/
 ```
+
 **Requirements**:
-- ✅ All 532 tests must pass
-- ✅ 91.32%+ code coverage maintained
+
+- ✅ All 1,126+ tests must pass
+- ✅ 90%+ code coverage maintained
 - ✅ 0 security vulnerabilities
 - ✅ No regressions in existing functionality
 
 ##### 5c. Build Verification
+
 For Android/native changes:
+
 ```bash
 cd MyRecipeApp
 eas build --platform android --profile preview
 ```
+
 - Validates Gradle compilation succeeds
 - Catches build configuration errors
 - Tests actual APK generation
 - Reviews EAS build logs for warnings/errors
 
 For web changes:
+
 ```bash
 npm run web
 ```
 
 For iOS changes:
+
 - Verify iOS build with Xcode (local development)
 
 **Real Example (Issue #99)**: EAS build testing revealed Gradle compilation failures that manual tests didn't catch. Configuration fixes were needed before the build could succeed.
 
 #### Step 6: Address Review Feedback
+
 - Respond to all reviewer comments
 - Make requested changes in new commits
 - Mark conversations as resolved
 - Request re-review when ready
 
 **For handling non-critical comments and creating technical debt issues**: See [CONTRIBUTING.md - Handling Code Review Comments](./CONTRIBUTING.md#-handling-code-review-comments) for detailed guidance on:
+
 - Prioritizing fixes vs. deferred work
 - Creating technical debt issues for unfixed comments
 - Adding PR comments that link to the created issue
 - Ensuring team visibility and accountability
 
 #### Step 7: Manual QA Testing
+
 Once all verification passes, test on actual devices:
+
 - **Android**: Install APK on device/emulator, test all workflows
 - **iOS**: Test on simulator, verify navigation and data flows
 - **Web**: Test in modern browsers (Chrome, Safari, Firefox)
 - **Cross-Platform**: Verify consistency across platforms
 
 **Key Workflows to Test**:
+
 - Navigation between screens
 - Data persistence across app restarts
 - Error handling (network failures, invalid input)
@@ -251,6 +340,7 @@ Once all verification passes, test on actual devices:
 - Accessibility (screen reader, contrast, touch targets)
 
 #### Step 8: Merge to Main
+
 Once all steps pass:
 
 ```bash
@@ -267,6 +357,7 @@ git push origin main
 ```
 
 #### Step 9: Post-Merge Cleanup
+
 ```bash
 git checkout main
 git pull origin main
@@ -282,20 +373,20 @@ For large features broken into multiple phases (like Issue #20: Video Transcript
 
 ### 📊 Status Tracking
 
-Keep the [status.md](./status.md) file updated throughout development:
+Keep the [docs/ROADMAP.md](docs/ROADMAP.md) updated throughout development:
+
 - Update after each phase completion with metrics and deliverables
 - Document any major decisions or pivots
 - Track blockers, dependencies, and next steps
 - Update weekly during active development
-- Reference this file for project context and history
 
-This ensures the team has visibility into progress and can quickly understand what's been done and what's remaining.
+See also [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ### Phase Implementation Strategy
 
 **Overview**: Each phase is a separate sub-issue with its own PR, allowing incremental development and review.
 
-```
+```text
 Parent Issue (#20): Video Transcription Feature
 ├─ Phase 1 (#110): Backend infrastructure
 │  ├─ Branch: feature/issue-20-video-transcription
@@ -322,24 +413,28 @@ Parent Issue (#20): Video Transcription Feature
 When code review comments are received, batch them by severity:
 
 **Priority 1: Critical Bugs** (same-day fix)
+
 - Logic errors, data loss risks, crashes
 - Security vulnerabilities
 - Memory leaks or resource exhaustion
 - Example: Job status not updated, file cleanup not executed
 
 **Priority 2: Memory/Performance** (1-2 hour fix)
+
 - Memory leaks (unbounded queues, job accumulation)
 - Race conditions in async code
 - Timeout handling issues
 - Example: 24-hour TTL cleanup, queue size limits
 
 **Priority 3: Code Quality** (within PR cycle)
+
 - Unused variables or properties
 - Inconsistent error messages
 - Redundant or dead code
 - Example: Remove unused bitrate properties, fix error message format
 
 **Priority 4: Tests & Documentation** (before merge)
+
 - Placeholder tests that need replacement
 - Missing comments on coverage thresholds
 - Example: Replace dummy tests with TODO comments
@@ -347,6 +442,7 @@ When code review comments are received, batch them by severity:
 ### Implementation Steps
 
 1. **Create Sub-Issues for Each Phase**
+
    ```markdown
    Title: feat(#20): [Phase N] Feature description
    Description:
@@ -357,6 +453,7 @@ When code review comments are received, batch them by severity:
    ```
 
 2. **Single Feature Branch for All Phases**
+
    ```bash
    # Create once at the start
    git checkout -b feature/issue-20-video-transcription
@@ -366,6 +463,7 @@ When code review comments are received, batch them by severity:
    ```
 
 3. **Implement & Test Phase Locally**
+
    ```bash
    npm test           # All tests pass
    npm audit         # Zero vulnerabilities
@@ -404,7 +502,8 @@ When code review comments are received, batch them by severity:
 **Scenario**: PR #119 received 17 code review comments
 
 **Solution Approach**:
-```
+
+```text
 Critical Bugs (5 items):
 ├─ Job status never set to 'processing'
 ├─ Video path not stored for cleanup
@@ -474,13 +573,15 @@ Brief description of what this phase accomplishes.
 ## Commit Message Standards
 
 Use this format for all commits:
-```
+
+```text
 type(#issue): subject
 
 body (optional)
 ```
 
 **Types**:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation
@@ -490,7 +591,8 @@ body (optional)
 - `chore`: Build, dependencies, tooling
 
 **Examples**:
-```
+
+```text
 feat(#100): add weekly meal planning feature
 fix(#99): resolve Android Gradle build failure
 docs(#50): update README with deployment guide
@@ -519,6 +621,7 @@ test(#102): add manual QA test cases
    - Only discoverable through actual build attempt
 
 **Impact if merged without verification**:
+
 - ❌ App crashes on startup for navigation users
 - ❌ Build pipeline fails, blocking Play Store submission
 - ❌ Runtime errors in production environment
@@ -531,24 +634,28 @@ test(#102): add manual QA test cases
 ## Development Best Practices
 
 ### Code Quality
+
 - ✅ Write tests for all new features (minimum 90% coverage)
 - ✅ Keep functions focused and small (<50 lines)
 - ✅ Document complex logic with comments
 - ✅ Use meaningful variable/function names
 
 ### Git Hygiene
+
 - ✅ Commit frequently (1 commit per logical unit)
 - ✅ Keep branches short-lived (<3 days)
 - ✅ Always pull before pushing
 - ✅ Never force-push to main
 
 ### Review Process
+
 - ✅ Respond to all feedback promptly
 - ✅ Ask clarifying questions if needed
 - ✅ Self-review before requesting review
 - ✅ Test changes locally before pushing
 
 ### Testing Strategy
+
 - ✅ Write tests as you code, not after
 - ✅ Test both happy path and error cases
 - ✅ Use meaningful test descriptions
@@ -559,7 +666,7 @@ test(#102): add manual QA test cases
 ## Common Workflow Issues & Solutions
 
 | Issue | Cause | Solution |
-|-------|-------|----------|
+| --- | --- | --- |
 | Merge conflicts | Long-lived branch | Rebase frequently: `git rebase main` |
 | Test failures after merge | Local testing incomplete | Run `npm test` before creating PR |
 | Build fails on CI | Missing dependencies | Run `npx expo install --check` |
@@ -570,47 +677,50 @@ test(#102): add manual QA test cases
 
 ## Current Development Status
 
-**Status**: APK build successful - now proceeding with manual QA testing  
-**Target Launch**: January 28, 2026  
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the full roadmap and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-**Recent Progress**:
-- ✅ Issue #100: Meal planning integration complete
-- ✅ Issue #99: Android Gradle build failure - RESOLVED
-  - Fixed missing peer dependency (`react-native-gesture-handler`)
-  - Fixed 7 critical dependency version mismatches
-  - Added explicit Android SDK versions to build config
-  - Consolidated app configuration (removed duplicate app.json)
-  - See [ISSUE_99_RESOLUTION.md](./ISSUE_99_RESOLUTION.md) for details
-  - PR #104 merged successfully
-  - APK build successful (69 MB)
-- ⏳ Issue #102: Manual QA testing (unblocked - APK ready)
-- ⏳ Issue #52: Play Store submission (unblocked - next after QA)
+**Completed**:
 
-**Unblocked Issues**:
-- 🟢 Issue #102: Manual QA testing (APK ready for testing)
-- 🟢 Issue #52: Play Store submission (unblocked after #99 resolution)
+- ✅ Phase 1: Backend fixes — video extraction, recipe/cost routes, security hardening
+- ✅ Documentation restructuring — 55+ files consolidated into organized `docs/` structure
+- ✅ APK build successful (69 MB)
+
+**In Progress**:
+
+- ⏳ Phase 2: UI redesign (planning)
+- ⏳ Local testing and manual QA
+- ⏳ Issue #175: npm audit vulnerability fixes
 
 ---
 
 ## Testing & Quality Standards
 
-- ✅ **Test Coverage**: Minimum 90% statement coverage required
-- ✅ **Test Pass Rate**: 100% (all 532 tests must pass)
+- ✅ **Test Coverage**: Minimum 90% statement coverage required (frontend), increasing for backend
+- ✅ **Test Pass Rate**: 100% (all 1,126+ tests must pass)
 - ✅ **Security**: 0 vulnerabilities allowed
 - ✅ **Pre-commit Checks**: ESLint, tests, and security audit must pass
-- ✅ **Build Verification**: Successful builds on all target platforms (iOS, Android, Web)
+- ✅ **Build Verification**: Successful builds on target platforms (Android, Web)
+- ✅ **Expo Dependency Check**: `npx expo install --check` must pass before merge
 
 ---
 
 ## Technology Stack
 
-**Framework**: React Native 0.81.5 with Expo 54.0.30  
-**State Management**: Context API with custom hooks  
-**Testing**: Jest (532 tests, 91.32% coverage)  
-**Build System**: EAS (Expo Application Services)  
-**Package Manager**: npm  
+| Layer | Technology |
+| --- | --- |
+| **Frontend** | React Native 0.81.5 + Expo SDK 54 |
+| **Backend** | Node.js (>=18) + Express 4.18 |
+| **AI** | Claude 3.5 Haiku via GitHub Models API |
+| **Navigation** | React Navigation 6.x (bottom tabs + stack) |
+| **Storage** | AsyncStorage (local persistence) |
+| **Logging** | Winston 3.11 |
+| **Security** | Helmet.js, express-rate-limit, CORS |
+| **Testing** | Jest 29.7 + @testing-library/react-native + Supertest |
+| **CI/CD** | GitHub Actions (4 parallel jobs) |
+| **Build** | EAS (Expo Application Services) |
 
 **Target Platforms**:
+
 - Android 6.0+ (API level 23) to Android 14 (API level 34)
-- iOS 13.0+
 - Web (modern browsers)
+- iOS (planned)
