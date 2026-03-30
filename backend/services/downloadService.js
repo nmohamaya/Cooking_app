@@ -235,6 +235,9 @@ const getVideoMetadata = async (url) => {
               title: metadata.title || 'Unknown',
               uploader: metadata.uploader || 'Unknown',
               uploadDate: metadata.upload_date,
+              description: metadata.description || '',
+              tags: metadata.tags || [],
+              categories: metadata.categories || [],
               url
             });
           } catch (error) {

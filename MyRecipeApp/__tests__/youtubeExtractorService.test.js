@@ -125,6 +125,7 @@ describe('youtubeExtractorService', () => {
         transcript: 'Cached transcript content',
         language: 'en',
         videoId: 'dQw4w9WgXcQ',
+        version: 2,
         cachedAt: Date.now(),
         expiresAt: Date.now() + 60 * 60 * 1000,
         version: 2,
