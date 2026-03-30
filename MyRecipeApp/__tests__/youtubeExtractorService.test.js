@@ -127,6 +127,7 @@ describe('youtubeExtractorService', () => {
         videoId: 'dQw4w9WgXcQ',
         cachedAt: Date.now(),
         expiresAt: Date.now() + 60 * 60 * 1000,
+        version: 2,
       };
       AsyncStorage.getItem.mockResolvedValue(JSON.stringify(cachedData));
 

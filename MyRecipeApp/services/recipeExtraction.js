@@ -116,7 +116,7 @@ export const parseExtractionError = (error) => {
 export const extractRecipeFromVideo = async (videoUrl) => {
   try {
     if (!GITHUB_TOKEN) {
-      throw new Error('GitHub token not configured. Please add GITHUB_TOKEN to .env file.');
+      throw new Error('GitHub token not configured. Please add GITHUB_TOKEN to .env file (or EXPO_PUBLIC_GITHUB_TOKEN for web builds).');
     }
 
     // Step 1: Get video transcript

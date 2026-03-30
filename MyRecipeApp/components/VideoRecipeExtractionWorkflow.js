@@ -153,7 +153,7 @@ const VideoRecipeExtractionWorkflow = ({
       setProgressStep(3);
       console.log('🤖 Sending transcript to AI for recipe extraction...');
       
-      const recipe = await extractRecipeFromText(transcript);
+      const recipe = await extractRecipeFromText(cleanedTranscript);
       console.log('🔍 AI extraction result:', recipe);
 
       if (!recipe || !recipe.title) {
