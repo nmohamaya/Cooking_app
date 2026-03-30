@@ -26,7 +26,7 @@ The workflow includes:
 - [ ] Make atomic commits with issue reference: `fix(#N): description`
 
 ### ✅ Before Creating PR
-- [ ] All tests pass locally (532/532)
+- [ ] All tests pass locally (1126+)
 - [ ] Security audit passes (0 vulnerabilities)
 - [ ] Code is self-reviewed
 - [ ] Commit messages reference issue number
@@ -40,7 +40,7 @@ The workflow includes:
 ### ⚠️ CRITICAL - Verify PR Functionality (Step 5)
 **This prevents shipping broken code. All PRs require:**
 - [ ] `npx expo install --check` passes (all dependencies aligned)
-- [ ] `npm test` passes (532/532 tests, 91.32%+ coverage)
+- [ ] `npm test` passes (1126+ tests, 90%+ coverage)
 - [ ] `npm run security` passes (0 vulnerabilities)
 - [ ] Platform builds succeed (EAS build or web build)
 - [ ] Build logs reviewed for warnings/errors
