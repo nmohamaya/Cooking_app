@@ -189,6 +189,55 @@ See **[docs/INDEX.md](docs/INDEX.md)** for the full documentation index.
 
 ---
 
+## 🔧 Troubleshooting
+
+If you encounter any issues during setup, check here first:
+
+### Common Issues & Solutions
+
+| Problem | Causes & Solutions |
+|---------|-------------------|
+| **Backend won't start: "yt-dlp command not found"** | • `yt-dlp` is not installed as a system package<br/>• It's installed via pip but not in your PATH<br/>**Fix:**<ul><li>Ubuntu/Debian: `sudo apt install yt-dlp`</li><li>macOS: `brew install yt-dlp`</li><li>Then: `yt-dlp --version` to verify</li></ul> |
+| **Backend won't start: "ffmpeg command not found"** | • `ffmpeg` is not installed as a system package<br/>**Fix:**<ul><li>Ubuntu/Debian: `sudo apt install ffmpeg`</li><li>macOS: `brew install ffmpeg`</li><li>Then: `ffmpeg -version` to verify</li></ul> |
+| **"GITHUB_TOKEN is required"** | • Missing `.env` file in `backend/` directory<br/>• `GITHUB_TOKEN` not set in `.env`<br/>**Fix:**<ul><li>Copy template: `cp backend/.env.example backend/.env`</li><li>Get token: https://github.com/settings/tokens</li><li>Add to `.env`: `GITHUB_TOKEN=ghp_xxx`</li><li>Restart: `npm run dev` (in backend/)</li></ul> |
+| **Frontend shows blank screen or can't connect to API** | • Backend is not running<br/>• Frontend points to wrong backend URL<br/>**Fix:**<ul><li>Start backend first: `cd backend && npm run dev`</li><li>Verify health: `curl http://localhost:3000/health`</li><li>Check frontend apiClient.js points to `localhost:3000`</li></ul> |
+| **Tests fail: "Cannot find module 'AsyncStorage'"** | • Jest mocks not loaded (jest.setup.js not configured)<br/>**Fix:**<ul><li>Frontend: Run from `MyRecipeApp/` directory</li><li>Backend: Run from `backend/` directory</li><li>Ensure `jest.config.js` is in the root of the directory you're testing</li></ul> |
+| **Expo dependency mismatch (CI fails but local tests pass)** | • Expo SDK version mismatch between local and CI<br/>**Fix:** `cd MyRecipeApp && npx expo install --check`<br/>Follow the suggestions to align dependencies<br/>Then commit the changes |
+| **Port 3000 already in use** | • Another process is using the backend port<br/>**Fix:**<ul><li>Find process: `lsof -i :3000` (macOS/Linux)</li><li>Kill it: `kill -9 <PID>`</li><li>Or change PORT in `backend/.env`</li></ul> |
+| **"Cannot read property 'apiClient' undefined" in frontend** | • API calls aren't mocked in tests<br/>**Fix:**<ul><li>Check `jest.setup.js` in `MyRecipeApp/`</li><li>Verify axios is mocked: `jest.mock('axios')`</li><li>Or use `@testing-library/react-native` testing utilities</li></ul> |
+| **Security audit fails ("npm audit")** | • Outdated npm packages with known vulnerabilities<br/>**Fix:**<ul><li>Update packages: `npm install`</li><li>Force audit pass: `npm audit --audit-level=moderate`</li><li>For critical issues, run: `npm audit fix --force`</li></ul> |
+
+### Pre-Merge Verification Checklist
+
+Before pushing changes to main, verify all of these:
+
+```bash
+# Frontend tests pass
+cd MyRecipeApp && npm test                     # Should show 100% pass rate
+npx expo install --check                       # Should find NO issues
+npm run lint                                   # Should have 0 ESLint errors
+npm run security                               # Should have 0 vulnerabilities
+
+# Backend tests pass
+cd ../backend && npm test                      # Should show 100% pass rate
+npm run lint                                   # Should have 0 ESLint errors
+npm run security                               # Should have 0 vulnerabilities
+
+# Verify backend is running
+npm run dev &                                  # Start in background
+sleep 2
+curl http://localhost:3000/health              # Should return 200 OK
+```
+
+### Getting Help
+
+- Check [docs/INDEX.md](docs/INDEX.md) for detailed documentation
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
+- Review [SECURITY.md](SECURITY.md) for security policies
+- Search [GitHub Issues](https://github.com/your-org/Cooking_app/issues) for reported problems
+
+---
+
 ## Development Workflow
 
 This project follows a structured development process designed to catch issues early and maintain code quality. All changes must go through this workflow to ensure stability and quality.
