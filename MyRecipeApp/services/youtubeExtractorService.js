@@ -23,7 +23,7 @@ const CACHE_CONFIG = {
  * Backend API configuration
  */
 const BACKEND_CONFIG = {
-  BASE_URL: process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000',
+  BASE_URL: process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001',
   TIMEOUT_MS: 5 * 60 * 1000, // 5 minutes for transcription
 };
 
@@ -306,10 +306,9 @@ const fetchTranscriptFromAPI = async (videoId, language) => {
   } catch (error) {
     console.error('[YouTube] Extraction failed:', error.message);
 
-    // If backend is not available, fall back to mock for development/testing
+    // If backend is not available, throw a clear error
     if (error.code === 'ECONNREFUSED' || error.message.includes('Network')) {
-      console.warn('[YouTube] Backend unavailable, using mock data for development');
-      return getMockTranscript(videoId);
+      throw new Error('Cannot connect to backend server. Please ensure the backend is running on port 3001.');
     }
 
     // Provide helpful error messages

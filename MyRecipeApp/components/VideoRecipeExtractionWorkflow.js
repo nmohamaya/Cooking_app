@@ -83,15 +83,16 @@ const VideoRecipeExtractionWorkflow = ({
     }
   };
 
-  const extractRecipeFromVideo = async () => {
+  const extractRecipeFromVideo = async (videoUrl) => {
+    const targetUrl = videoUrl || url;
     try {
       // Step 1: Get video transcript based on URL platform
-      console.log('🎬 Starting video extraction for URL:', url);
+      console.log('🎬 Starting video extraction for URL:', targetUrl);
       setProgressStep(1);
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const provider = urlValidator.getVideoProvider(url);
-      const videoId = urlValidator.extractVideoId(url);
+      const provider = urlValidator.getVideoProvider(targetUrl);
+      const videoId = urlValidator.extractVideoId(targetUrl);
 
       console.log('📺 Detected provider:', provider, 'Video ID:', videoId);
 
@@ -132,11 +133,13 @@ const VideoRecipeExtractionWorkflow = ({
         throw new Error(`Unsupported platform: ${provider}`);
       }
 
-      if (!transcript || transcript.trim().length === 0) {
+      // Check for missing or useless transcripts (e.g., just [Music] tags and single letters)
+      const cleanedTranscript = (transcript || '').replace(/\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
+      if (!transcript || cleanedTranscript.length < 50) {
         throw new Error(
-          `No transcript or description found for this ${provider} video. ` +
-          `The video may not have captions/description available. ` +
-          `Please try another video with captions enabled.`
+          `No meaningful transcript found for this ${provider} video. ` +
+          `The video may only contain music without spoken words. ` +
+          `Please try a video where the chef narrates the recipe.`
         );
       }
 
@@ -149,23 +152,6 @@ const VideoRecipeExtractionWorkflow = ({
       // Step 3: Process with AI
       setProgressStep(3);
       console.log('🤖 Sending transcript to AI for recipe extraction...');
-      
-      // Check if GitHub token is configured
-      if (!process.env.EXPO_PUBLIC_GITHUB_TOKEN && typeof window !== 'undefined') {
-        // Browser environment without token
-        throw new Error(
-          'GitHub token not configured! 🔐\n\n' +
-          'Recipe extraction requires a GitHub token for AI access.\n\n' +
-          'Setup Instructions:\n' +
-          '1. Go to: https://github.com/settings/tokens\n' +
-          '2. Click "Generate new token (classic)"\n' +
-          '3. Select scopes: repo, read:packages\n' +
-          '4. Create file ".env" in MyRecipeApp folder\n' +
-          '5. Add: GITHUB_TOKEN=your_token_here\n' +
-          '6. Restart the app (npm start)\n\n' +
-          'GitHub Models offers FREE access to GPT-4o!'
-        );
-      }
       
       const recipe = await extractRecipeFromText(transcript);
       console.log('🔍 AI extraction result:', recipe);
@@ -270,6 +256,10 @@ const VideoRecipeExtractionWorkflow = ({
               Paste a link to a cooking video from YouTube, TikTok, Instagram, or a blog.
             </Text>
 
+            {error && (
+              <Text style={styles.errorText}>{error}</Text>
+            )}
+
             <VideoRecipeInput
               onVideoSelected={(video) => handleUrlChange(video?.url ?? '')}
               onExtractStart={() => {
@@ -278,10 +268,10 @@ const VideoRecipeExtractionWorkflow = ({
                 setProgressStep(1);
                 setError(null);
               }}
-              onExtractSuccess={async () => {
+              onExtractSuccess={async (data) => {
                 // Trigger the extraction workflow
                 try {
-                  await simulateExtractionWorkflow();
+                  await extractRecipeFromVideo(data?.url);
                 } catch (err) {
                   setError(err.message || 'Failed to extract recipe from video');
                   setIsProcessing(false);
