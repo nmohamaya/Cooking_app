@@ -64,6 +64,14 @@ async function scrapeRecipe(url) {
  */
 async function fetchPage(url) {
   try {
+    // SSRF protection: block private/loopback IPs
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname;
+    if (isPrivateHost(hostname)) {
+      logger.warn('Blocked SSRF attempt to private/loopback address', { url, hostname });
+      return null;
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
@@ -331,6 +339,27 @@ function parseDuration(duration) {
   return parts.join(' ') || '';
 }
 
+/**
+ * Check if a hostname resolves to a private/loopback address (SSRF protection)
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+function isPrivateHost(hostname) {
+  // Block loopback
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+    return true;
+  }
+  // Block private IPv4 ranges
+  const privateRanges = [
+    /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+    /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/,
+    /^192\.168\.\d{1,3}\.\d{1,3}$/,
+    /^0\.0\.0\.0$/,
+    /^169\.254\.\d{1,3}\.\d{1,3}$/, // link-local
+  ];
+  return privateRanges.some(r => r.test(hostname));
+}
+
 module.exports = {
   scrapeRecipe,
   fetchPage,
@@ -340,4 +369,5 @@ module.exports = {
   parseDuration,
   normalizeIngredients,
   normalizeInstructions,
+  isPrivateHost,
 };

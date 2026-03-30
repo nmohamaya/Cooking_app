@@ -7,7 +7,6 @@
 
 const axios = require('axios');
 const logger = require('../config/logger');
-const env = require('../config/env');
 
 const API_URL = 'https://models.inference.ai.azure.com';
 const MODEL_NAME = 'gpt-4o';
@@ -185,6 +184,7 @@ async function extractRecipe(text, sourceType = 'transcript') {
  * @returns {object} Normalized recipe
  */
 function normalizeRecipe(recipe) {
+  if (!recipe) return { title: '', category: 'Dinner', ingredients: '', instructions: '', prepTime: '', cookTime: '' };
   const title = String(recipe.title || '').trim();
   const ingredients = String(recipe.ingredients || '').trim();
   const instructions = String(recipe.instructions || '').trim();

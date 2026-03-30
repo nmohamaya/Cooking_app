@@ -8,6 +8,20 @@ const { validateUrl } = require('../services/downloadService');
 // In-memory job queue for extraction jobs
 const extractionJobs = new Map();
 
+// Cleanup completed jobs older than 30 minutes
+const JOB_TTL_MS = 30 * 60 * 1000;
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [jobId, job] of extractionJobs) {
+    if (job.completedAt && (now - new Date(job.completedAt).getTime()) > JOB_TTL_MS) {
+      extractionJobs.delete(jobId);
+      logger.debug('Cleaned up expired extraction job', { jobId });
+    }
+  }
+}, CLEANUP_INTERVAL_MS).unref();
+
 /**
  * POST /api/extract
  * Start a recipe extraction job with fallback cascade

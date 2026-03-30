@@ -95,7 +95,9 @@ async function extractRecipeFromVideo(url, options = {}) {
         }
       }
 
-      result.attempts.push({ source: 'description', status: 'no-recipe-content' });
+      if (!result.attempts.some(a => a.source === 'description' && a.status === 'tried')) {
+        result.attempts.push({ source: 'description', status: 'no-recipe-content' });
+      }
       updateStep('Checking description', 'completed', 'No recipe found');
     } else {
       updateStep('Checking description', 'skipped', 'No description available');
@@ -166,7 +168,8 @@ async function extractRecipeFromVideo(url, options = {}) {
               result.success = true;
               result.recipe = aiExtraction.normalizeRecipe(scraped.recipe);
               result.source = `linked-url:${scraped.source}`;
-              updateStep('Checking linked sites', 'completed', `Recipe found on ${new URL(linkedUrl).hostname}`);
+              const hostname = safeHostname(linkedUrl);
+              updateStep('Checking linked sites', 'completed', `Recipe found on ${hostname}`);
               logger.info('Recipe extracted from linked URL', { url, linkedUrl, source: scraped.source });
               return result;
             }
@@ -180,7 +183,7 @@ async function extractRecipeFromVideo(url, options = {}) {
               result.success = true;
               result.recipe = recipe;
               result.source = `linked-url:${scraped.source}`;
-              updateStep('Checking linked sites', 'completed', `Recipe found on ${new URL(linkedUrl).hostname}`);
+              updateStep('Checking linked sites', 'completed', `Recipe found on ${safeHostname(linkedUrl)}`);
               logger.info('Recipe extracted from linked URL via AI', { url, linkedUrl });
               return result;
             }
@@ -213,6 +216,19 @@ async function extractRecipeFromVideo(url, options = {}) {
   } catch (error) {
     logger.error('Orchestrator error', { url, error: error.message });
     throw error;
+  }
+}
+
+/**
+ * Safely extract hostname from a URL string
+ * @param {string} urlStr
+ * @returns {string}
+ */
+function safeHostname(urlStr) {
+  try {
+    return new URL(urlStr).hostname;
+  } catch {
+    return urlStr;
   }
 }
 
