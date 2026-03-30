@@ -17,13 +17,14 @@ import axios from 'axios';
 const CACHE_CONFIG = {
   TTL_MS: 60 * 60 * 1000, // 1 hour in milliseconds
   KEY_PREFIX: 'youtube_transcript_',
+  VERSION: 2, // Increment to invalidate all old cache entries (v1 had mock data bug)
 };
 
 /**
  * Backend API configuration
  */
 const BACKEND_CONFIG = {
-  BASE_URL: process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000',
+  BASE_URL: process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001',
   TIMEOUT_MS: 5 * 60 * 1000, // 5 minutes for transcription
 };
 
@@ -237,6 +238,12 @@ const getCachedTranscript = async (videoId, language) => {
     const data = JSON.parse(cached);
     const now = Date.now();
 
+    // Invalidate cache entries from older versions (e.g., mock data bug in v1)
+    if (!data.version || data.version < CACHE_CONFIG.VERSION) {
+      await AsyncStorage.removeItem(key);
+      return null;
+    }
+
     // Check if cache has expired
     if (data.expiresAt && now > data.expiresAt) {
       await AsyncStorage.removeItem(key);
@@ -261,6 +268,7 @@ const cacheTranscript = async (videoId, language, transcript) => {
       transcript,
       language,
       videoId,
+      version: CACHE_CONFIG.VERSION,
       cachedAt: Date.now(),
       expiresAt: Date.now() + CACHE_CONFIG.TTL_MS,
     };
@@ -306,10 +314,9 @@ const fetchTranscriptFromAPI = async (videoId, language) => {
   } catch (error) {
     console.error('[YouTube] Extraction failed:', error.message);
 
-    // If backend is not available, fall back to mock for development/testing
+    // If backend is not available, throw a clear error
     if (error.code === 'ECONNREFUSED' || error.message.includes('Network')) {
-      console.warn('[YouTube] Backend unavailable, using mock data for development');
-      return getMockTranscript(videoId);
+      throw new Error(`Cannot connect to backend server at ${BACKEND_CONFIG.BASE_URL}. Please ensure the backend is running.`);
     }
 
     // Provide helpful error messages
@@ -363,47 +370,6 @@ const pollTranscriptionJob = async (jobId, maxAttempts = 30, intervalMs = 1000) 
   }
 
   throw new Error('Transcription timed out after polling');
-};
-
-/**
- * Get mock transcript for testing/development
- * @private
- */
-const getMockTranscript = (videoId) => {
-  // For testing, simulate various scenarios
-  if (videoId === 'invalid' || videoId === 'not-found') {
-    return null;
-  }
-
-  if (videoId === 'no-captions') {
-    return null;
-  }
-
-  // Return mock transcript
-  return `Welcome to today's recipe video! Today we're making delicious chocolate chip cookies.
-
-INGREDIENTS:
-2 and 1/4 cups all-purpose flour
-1 teaspoon baking soda
-1 teaspoon salt
-1 cup butter, softened
-3/4 cup granulated sugar
-3/4 cup packed brown sugar
-2 large eggs
-2 teaspoons vanilla extract
-2 cups chocolate chips
-
-INSTRUCTIONS:
-First, preheat your oven to 375 degrees Fahrenheit.
-In a small bowl, combine the flour, baking soda, and salt.
-In a larger bowl, beat the butter and both sugars together until creamy.
-Add the eggs and vanilla extract to the butter mixture and beat well.
-Gradually stir in the flour mixture until just combined.
-Fold in the chocolate chips.
-Drop rounded tablespoons of dough onto baking sheets.
-Bake for 9 to 11 minutes or until golden brown.
-Cool on baking sheets for 2 minutes, then transfer to wire racks.
-Enjoy your homemade cookies!`;
 };
 
 /**

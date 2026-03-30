@@ -2,9 +2,9 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 
 // GitHub Models API Configuration
-// In React Native/Expo, use Constants.expoConfig.extra for environment variables
-// Using GitHub Models provides free access to AI models for GitHub users
-const GITHUB_TOKEN = Constants.expoConfig?.extra?.githubToken || '';
+// On native: loaded via Constants.expoConfig.extra (set in app.config.js)
+// On web: EXPO_PUBLIC_ prefixed env vars are available via process.env
+const GITHUB_TOKEN = Constants.expoConfig?.extra?.githubToken || process.env.EXPO_PUBLIC_GITHUB_TOKEN || '';
 const API_URL = 'https://models.inference.ai.azure.com';
 const MODEL_NAME = 'gpt-4o'; // Free GitHub Models: gpt-4o, gpt-4o-mini, llama-3.1-405b, etc.
 const EXTRACTION_TIMEOUT = 15000; // 15 second timeout
@@ -116,7 +116,7 @@ export const parseExtractionError = (error) => {
 export const extractRecipeFromVideo = async (videoUrl) => {
   try {
     if (!GITHUB_TOKEN) {
-      throw new Error('GitHub token not configured. Please add GITHUB_TOKEN to .env file.');
+      throw new Error('GitHub token not configured. Please add GITHUB_TOKEN to .env file (or EXPO_PUBLIC_GITHUB_TOKEN for web builds).');
     }
 
     // Step 1: Get video transcript
