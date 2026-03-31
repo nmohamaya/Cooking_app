@@ -5,22 +5,32 @@ import {
   StyleSheet,
   Animated,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const STEPS = [
-  { id: 'extracting', label: 'Extracting', icon: 'download-outline' },
-  { id: 'processing', label: 'Processing', icon: 'pulse-outline' },
-  { id: 'formatting', label: 'Formatting', icon: 'checkmark-done-outline' },
-];
+// Icon mapping for backend step names
+const STEP_ICONS = {
+  'Fetching video info': 'videocam-outline',
+  'Checking description': 'document-text-outline',
+  'Extracting captions': 'chatbubble-outline',
+  'Checking linked sites': 'link-outline',
+};
+
+// Visual config per step status
+const STATUS_STYLES = {
+  completed: { bg: '#4CAF50', border: '#45A049', icon: 'checkmark' },
+  'in-progress': { bg: '#2196F3', border: '#1976D2', icon: null },
+  skipped: { bg: '#FF9800', border: '#F57C00', icon: 'remove-outline' },
+  failed: { bg: '#FF6B6B', border: '#E53935', icon: 'close' },
+  pending: { bg: '#E8E8E8', border: '#E8E8E8', icon: null },
+};
 
 const TranscriptionProgress = ({
-  currentStep = 'extracting', // 'extracting', 'processing', 'formatting'
-  progress = 0, // 0-100
+  steps = [],          // Dynamic steps array: [{ name, status, detail, timestamp }]
+  progress = 0,        // 0-100
   isActive = true,
   onCancel = () => {},
-  elapsedTime = 0, // in seconds
+  elapsedTime = 0,     // in seconds
   estimatedTime = null, // in seconds
   showSteps = true,
   showProgressBar = true,
@@ -29,7 +39,6 @@ const TranscriptionProgress = ({
   const [displayTime, setDisplayTime] = useState(formatTime(elapsedTime));
   const [progressAnim] = useState(new Animated.Value(0));
   const [pulseAnim] = useState(new Animated.Value(1));
-  const windowWidth = Dimensions.get('window').width - 32; // 16px padding on each side
 
   // Update display time
   useEffect(() => {
@@ -65,10 +74,11 @@ const TranscriptionProgress = ({
     }
   }, [isActive, pulseAnim]);
 
-  // Get current step index
-  const currentStepIndex = STEPS.findIndex((s) => s.id === currentStep);
   const progressPercent = Math.min(progress, 100);
-  const progressWidth = (progressPercent / 100) * windowWidth;
+  const activeStep = steps.find(s => s.status === 'in-progress');
+  const allTerminal = steps.length > 0 && steps.every(s =>
+    s.status === 'completed' || s.status === 'skipped' || s.status === 'failed'
+  );
 
   // Format time helper
   function formatTime(seconds) {
@@ -94,6 +104,30 @@ const TranscriptionProgress = ({
     return formatTime(Math.max(0, remaining));
   };
 
+  // Get icon for a step based on its status and name
+  const getStepIcon = (step) => {
+    const statusStyle = STATUS_STYLES[step.status] || STATUS_STYLES.pending;
+    if (statusStyle.icon) return statusStyle.icon;
+    return STEP_ICONS[step.name] || 'ellipse-outline';
+  };
+
+  // Get style for a step based on its status
+  const getIndicatorStyle = (step) => {
+    const statusStyle = STATUS_STYLES[step.status] || STATUS_STYLES.pending;
+    return {
+      backgroundColor: statusStyle.bg,
+      borderColor: statusStyle.border,
+    };
+  };
+
+  // Get status message from active step detail or fallback
+  const getStatusMessage = () => {
+    if (activeStep?.detail) return activeStep.detail;
+    if (activeStep?.name) return `${activeStep.name}...`;
+    if (allTerminal) return 'Processing complete';
+    return 'Preparing...';
+  };
+
   return (
     <View style={[styles.container, !isActive && styles.inactive]}>
       {/* Header with title and timer */}
@@ -101,7 +135,7 @@ const TranscriptionProgress = ({
         <View style={styles.titleSection}>
           <Text style={styles.title}>Extracting Recipe...</Text>
           <Text style={styles.subtitle}>
-            {STEPS[currentStepIndex]?.label || currentStep}
+            {activeStep?.name || (allTerminal ? 'Done' : 'Starting...')}
           </Text>
         </View>
 
@@ -119,29 +153,22 @@ const TranscriptionProgress = ({
       </View>
 
       {/* Steps indicator */}
-      {showSteps && (
+      {showSteps && steps.length > 0 && (
         <View style={styles.stepsContainer}>
-          {STEPS.map((step, index) => (
-            <View key={step.id} style={styles.stepWrapper}>
+          {steps.map((step, index) => (
+            <View key={step.name || index} style={styles.stepWrapper}>
               {/* Step indicator */}
               <Animated.View
                 style={[
                   styles.stepIndicator,
-                  currentStepIndex === index && styles.stepActive,
-                  currentStepIndex > index && styles.stepCompleted,
-                  currentStepIndex === index && { transform: [{ scale: pulseAnim }] },
+                  getIndicatorStyle(step),
+                  step.status === 'in-progress' && { transform: [{ scale: pulseAnim }] },
                 ]}
               >
                 <Ionicons
-                  name={
-                    currentStepIndex > index
-                      ? 'checkmark'
-                      : step.icon
-                  }
+                  name={getStepIcon(step)}
                   size={16}
-                  color={
-                    currentStepIndex >= index ? '#FFF' : '#999'
-                  }
+                  color={step.status === 'pending' ? '#999' : '#FFF'}
                 />
               </Animated.View>
 
@@ -149,18 +176,21 @@ const TranscriptionProgress = ({
               <Text
                 style={[
                   styles.stepLabel,
-                  currentStepIndex >= index && styles.stepLabelActive,
+                  step.status !== 'pending' && styles.stepLabelActive,
+                  step.status === 'skipped' && styles.stepLabelSkipped,
+                  step.status === 'failed' && styles.stepLabelFailed,
                 ]}
+                numberOfLines={2}
               >
-                {step.label}
+                {step.name}
               </Text>
 
               {/* Connector line */}
-              {index < STEPS.length - 1 && (
+              {index < steps.length - 1 && (
                 <View
                   style={[
                     styles.stepConnector,
-                    currentStepIndex > index && styles.stepConnectorCompleted,
+                    step.status === 'completed' && styles.stepConnectorCompleted,
                   ]}
                 />
               )}
@@ -193,9 +223,7 @@ const TranscriptionProgress = ({
       <View style={styles.statusSection}>
         <View style={styles.statusDot} />
         <Text style={styles.statusText}>
-          {currentStepIndex === 0 && 'Downloading video content...'}
-          {currentStepIndex === 1 && 'Analyzing and transcribing...'}
-          {currentStepIndex === 2 && 'Formatting recipe data...'}
+          {getStatusMessage()}
         </Text>
       </View>
 
@@ -212,7 +240,7 @@ const TranscriptionProgress = ({
       )}
 
       {/* Completed state */}
-      {!isActive && currentStepIndex === STEPS.length - 1 && (
+      {!isActive && allTerminal && steps.some(s => s.status === 'completed') && (
         <View style={styles.completedBanner}>
           <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
           <Text style={styles.completedText}>Extraction Complete!</Text>
@@ -296,16 +324,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#E8E8E8',
   },
-  stepActive: {
-    backgroundColor: '#2196F3',
-    borderColor: '#1976D2',
-  },
-  stepCompleted: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#45A049',
-  },
   stepLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
     textAlign: 'center',
     fontWeight: '500',
@@ -313,6 +333,12 @@ const styles = StyleSheet.create({
   stepLabelActive: {
     color: '#333',
     fontWeight: '600',
+  },
+  stepLabelSkipped: {
+    color: '#FF9800',
+  },
+  stepLabelFailed: {
+    color: '#FF6B6B',
   },
   stepConnector: {
     position: 'absolute',

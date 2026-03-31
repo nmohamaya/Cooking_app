@@ -1,24 +1,44 @@
 /**
  * TranscriptionProgress Component Tests
- * 
- * These tests verify the transcription progress component logic for Phase 5 UI integration.
+ *
+ * These tests verify the transcription progress component logic.
  * The TranscriptionProgress component shows:
- * - Step progression (Extracting → Processing → Formatting)
+ * - Dynamic step progression from backend (Fetching → Description → Captions → Linked sites)
+ * - Step statuses: pending, in-progress, completed, skipped, failed
  * - Real-time progress bar updates (0-100%)
  * - Elapsed and estimated time tracking
  * - Cancel functionality
- * - Status messages for each step
- * 
+ * - Status messages derived from step detail fields
+ *
  * Note: Component rendering tests would require mocking React Native and Expo
  * dependencies. These tests focus on core logic validation.
  */
 
 describe('TranscriptionProgress Logic', () => {
-  const STEPS = [
-    { id: 'extracting', label: 'Extracting' },
-    { id: 'processing', label: 'Processing' },
-    { id: 'formatting', label: 'Formatting' },
+  // Backend step shape matching /api/extract response
+  const BACKEND_STEPS = [
+    { name: 'Fetching video info', status: 'pending' },
+    { name: 'Checking description', status: 'pending' },
+    { name: 'Extracting captions', status: 'pending' },
+    { name: 'Checking linked sites', status: 'pending' },
   ];
+
+  // Step icon mapping (mirrors component logic)
+  const STEP_ICONS = {
+    'Fetching video info': 'videocam-outline',
+    'Checking description': 'document-text-outline',
+    'Extracting captions': 'chatbubble-outline',
+    'Checking linked sites': 'link-outline',
+  };
+
+  // Status style mapping (mirrors component logic)
+  const STATUS_STYLES = {
+    completed: { bg: '#4CAF50', border: '#45A049', icon: 'checkmark' },
+    'in-progress': { bg: '#2196F3', border: '#1976D2', icon: null },
+    skipped: { bg: '#FF9800', border: '#F57C00', icon: 'remove-outline' },
+    failed: { bg: '#FF6B6B', border: '#E53935', icon: 'close' },
+    pending: { bg: '#E8E8E8', border: '#E8E8E8', icon: null },
+  };
 
   // Helper to format time
   function formatTime(seconds) {
@@ -35,63 +55,188 @@ describe('TranscriptionProgress Logic', () => {
     return `${secs}s`;
   }
 
-  describe('Step Progression', () => {
-    test('should have 3 steps defined', () => {
-      expect(STEPS.length).toBe(3);
+  // Helper: get icon for a step based on status and name
+  function getStepIcon(step) {
+    const statusStyle = STATUS_STYLES[step.status] || STATUS_STYLES.pending;
+    if (statusStyle.icon) return statusStyle.icon;
+    return STEP_ICONS[step.name] || 'ellipse-outline';
+  }
+
+  // Helper: find active step
+  function getActiveStep(steps) {
+    return steps.find(s => s.status === 'in-progress') || null;
+  }
+
+  // Helper: check if all steps are terminal
+  function allTerminal(steps) {
+    return steps.length > 0 && steps.every(s =>
+      s.status === 'completed' || s.status === 'skipped' || s.status === 'failed'
+    );
+  }
+
+  describe('Dynamic Step Structure', () => {
+    test('should accept 4 backend steps', () => {
+      expect(BACKEND_STEPS.length).toBe(4);
     });
 
-    test('should have extracting as first step', () => {
-      expect(STEPS[0].id).toBe('extracting');
+    test('should have correct step names', () => {
+      expect(BACKEND_STEPS[0].name).toBe('Fetching video info');
+      expect(BACKEND_STEPS[1].name).toBe('Checking description');
+      expect(BACKEND_STEPS[2].name).toBe('Extracting captions');
+      expect(BACKEND_STEPS[3].name).toBe('Checking linked sites');
     });
 
-    test('should have processing as second step', () => {
-      expect(STEPS[1].id).toBe('processing');
-    });
-
-    test('should have formatting as third step', () => {
-      expect(STEPS[2].id).toBe('formatting');
-    });
-
-    test('should identify step index correctly', () => {
-      const getCurrentStepIndex = (stepId) => {
-        return STEPS.findIndex((s) => s.id === stepId);
-      };
-
-      expect(getCurrentStepIndex('extracting')).toBe(0);
-      expect(getCurrentStepIndex('processing')).toBe(1);
-      expect(getCurrentStepIndex('formatting')).toBe(2);
-    });
-
-    test('should handle invalid step gracefully', () => {
-      const getCurrentStepIndex = (stepId) => {
-        return STEPS.findIndex((s) => s.id === stepId);
-      };
-
-      expect(getCurrentStepIndex('invalid')).toBe(-1);
-    });
-
-    test('should track step progression from extracting to processing', () => {
-      const steps = ['extracting', 'processing', 'formatting'];
-      let currentStep = 0;
-
-      steps.forEach((step, index) => {
-        expect(STEPS[index].id).toBe(step);
+    test('should initialize all steps as pending', () => {
+      BACKEND_STEPS.forEach(step => {
+        expect(step.status).toBe('pending');
       });
-
-      currentStep = 1;
-      expect(STEPS[currentStep].id).toBe('processing');
     });
 
-    test('should track step progression to completion', () => {
-      let currentStep = 0;
-      const steps = ['extracting', 'processing', 'formatting'];
-
-      steps.forEach((_, index) => {
-        expect(STEPS[index].id).toBeDefined();
+    test('should map step names to icons', () => {
+      BACKEND_STEPS.forEach(step => {
+        expect(STEP_ICONS[step.name]).toBeDefined();
       });
+    });
 
-      currentStep = STEPS.length - 1;
-      expect(STEPS[currentStep].id).toBe('formatting');
+    test('should handle unknown step names gracefully', () => {
+      const unknownStep = { name: 'Unknown step', status: 'pending' };
+      expect(getStepIcon(unknownStep)).toBe('ellipse-outline');
+    });
+  });
+
+  describe('Step Status Rendering', () => {
+    test('should show step icon for pending steps', () => {
+      const step = { name: 'Fetching video info', status: 'pending' };
+      expect(getStepIcon(step)).toBe('videocam-outline');
+    });
+
+    test('should show step icon for in-progress steps', () => {
+      const step = { name: 'Checking description', status: 'in-progress' };
+      expect(getStepIcon(step)).toBe('document-text-outline');
+    });
+
+    test('should show checkmark for completed steps', () => {
+      const step = { name: 'Fetching video info', status: 'completed' };
+      expect(getStepIcon(step)).toBe('checkmark');
+    });
+
+    test('should show remove icon for skipped steps', () => {
+      const step = { name: 'Checking description', status: 'skipped' };
+      expect(getStepIcon(step)).toBe('remove-outline');
+    });
+
+    test('should show close icon for failed steps', () => {
+      const step = { name: 'Extracting captions', status: 'failed' };
+      expect(getStepIcon(step)).toBe('close');
+    });
+
+    test('should have correct colors for each status', () => {
+      expect(STATUS_STYLES.completed.bg).toBe('#4CAF50');
+      expect(STATUS_STYLES['in-progress'].bg).toBe('#2196F3');
+      expect(STATUS_STYLES.skipped.bg).toBe('#FF9800');
+      expect(STATUS_STYLES.failed.bg).toBe('#FF6B6B');
+      expect(STATUS_STYLES.pending.bg).toBe('#E8E8E8');
+    });
+  });
+
+  describe('Active Step Detection', () => {
+    test('should find the in-progress step', () => {
+      const steps = [
+        { name: 'Fetching video info', status: 'completed' },
+        { name: 'Checking description', status: 'in-progress' },
+        { name: 'Extracting captions', status: 'pending' },
+        { name: 'Checking linked sites', status: 'pending' },
+      ];
+      expect(getActiveStep(steps).name).toBe('Checking description');
+    });
+
+    test('should return null when no step is in-progress', () => {
+      const steps = [
+        { name: 'Fetching video info', status: 'completed' },
+        { name: 'Checking description', status: 'completed' },
+        { name: 'Extracting captions', status: 'completed' },
+        { name: 'Checking linked sites', status: 'skipped' },
+      ];
+      expect(getActiveStep(steps)).toBeNull();
+    });
+
+    test('should return null for empty steps', () => {
+      expect(getActiveStep([])).toBeNull();
+    });
+  });
+
+  describe('Terminal State Detection', () => {
+    test('should detect all completed as terminal', () => {
+      const steps = [
+        { name: 'Fetching video info', status: 'completed' },
+        { name: 'Checking description', status: 'completed' },
+        { name: 'Extracting captions', status: 'completed' },
+        { name: 'Checking linked sites', status: 'completed' },
+      ];
+      expect(allTerminal(steps)).toBe(true);
+    });
+
+    test('should detect mix of completed and skipped as terminal', () => {
+      const steps = [
+        { name: 'Fetching video info', status: 'completed' },
+        { name: 'Checking description', status: 'skipped' },
+        { name: 'Extracting captions', status: 'completed' },
+        { name: 'Checking linked sites', status: 'skipped' },
+      ];
+      expect(allTerminal(steps)).toBe(true);
+    });
+
+    test('should detect mix with failed as terminal', () => {
+      const steps = [
+        { name: 'Fetching video info', status: 'completed' },
+        { name: 'Checking description', status: 'failed' },
+        { name: 'Extracting captions', status: 'skipped' },
+        { name: 'Checking linked sites', status: 'skipped' },
+      ];
+      expect(allTerminal(steps)).toBe(true);
+    });
+
+    test('should not detect pending as terminal', () => {
+      const steps = [
+        { name: 'Fetching video info', status: 'completed' },
+        { name: 'Checking description', status: 'pending' },
+        { name: 'Extracting captions', status: 'pending' },
+        { name: 'Checking linked sites', status: 'pending' },
+      ];
+      expect(allTerminal(steps)).toBe(false);
+    });
+
+    test('should not detect in-progress as terminal', () => {
+      const steps = [
+        { name: 'Fetching video info', status: 'completed' },
+        { name: 'Checking description', status: 'in-progress' },
+        { name: 'Extracting captions', status: 'pending' },
+        { name: 'Checking linked sites', status: 'pending' },
+      ];
+      expect(allTerminal(steps)).toBe(false);
+    });
+
+    test('should not treat empty steps as terminal', () => {
+      expect(allTerminal([])).toBe(false);
+    });
+  });
+
+  describe('Step Detail Messages', () => {
+    test('should use step detail as status message when available', () => {
+      const step = { name: 'Checking description', status: 'completed', detail: 'Recipe found in description' };
+      expect(step.detail).toBe('Recipe found in description');
+    });
+
+    test('should fall back to step name when no detail', () => {
+      const step = { name: 'Extracting captions', status: 'in-progress' };
+      const message = step.detail || `${step.name}...`;
+      expect(message).toBe('Extracting captions...');
+    });
+
+    test('should handle steps with null detail', () => {
+      const step = { name: 'Checking linked sites', status: 'pending', detail: null };
+      const message = step.detail || `${step.name}...`;
+      expect(message).toBe('Checking linked sites...');
     });
   });
 
@@ -126,7 +271,6 @@ describe('TranscriptionProgress Logic', () => {
     });
 
     test('should handle negative values', () => {
-      // Should not crash, might return negative or 0
       expect(() => formatTime(-10)).not.toThrow();
     });
   });
@@ -143,23 +287,19 @@ describe('TranscriptionProgress Logic', () => {
     });
 
     test('should calculate progress at 25%', () => {
-      const progress = 25;
-      expect(progress).toBe(25);
+      expect(25).toBe(25);
     });
 
     test('should calculate progress at 50%', () => {
-      const progress = 50;
-      expect(progress).toBe(50);
+      expect(50).toBe(50);
     });
 
     test('should calculate progress at 75%', () => {
-      const progress = 75;
-      expect(progress).toBe(75);
+      expect(75).toBe(75);
     });
 
     test('should calculate progress at 100%', () => {
-      const progress = 100;
-      expect(progress).toBe(100);
+      expect(100).toBe(100);
     });
 
     test('should round progress percentage', () => {
@@ -210,8 +350,8 @@ describe('TranscriptionProgress Logic', () => {
     });
 
     test('should calculate remaining time for long tasks', () => {
-      const elapsedTime = 1800; // 30 minutes
-      const estimatedTime = 3600; // 1 hour
+      const elapsedTime = 1800;
+      const estimatedTime = 3600;
       const remaining = estimatedTime - elapsedTime;
 
       expect(formatTime(remaining)).toBe('30m 0s');
@@ -226,114 +366,51 @@ describe('TranscriptionProgress Logic', () => {
     });
   });
 
-  describe('Step-to-Progress Mapping', () => {
-    test('should map extracting step to 0-33% progress', () => {
-      const currentStep = 'extracting';
-      const progress = 20; // 0-33% range
-      expect(progress).toBeLessThanOrEqual(33);
-    });
-
-    test('should map processing step to 34-66% progress', () => {
-      const currentStep = 'processing';
-      const progress = 50; // 34-66% range
-      expect(progress).toBeGreaterThan(33);
-      expect(progress).toBeLessThanOrEqual(66);
-    });
-
-    test('should map formatting step to 67-100% progress', () => {
-      const currentStep = 'formatting';
-      const progress = 85; // 67-100% range
-      expect(progress).toBeGreaterThan(66);
-      expect(progress).toBeLessThanOrEqual(100);
-    });
-
-    test('should track progress sequence across steps', () => {
-      const stepProgression = [
-        { step: 'extracting', progress: 25 },
-        { step: 'processing', progress: 50 },
-        { step: 'formatting', progress: 95 },
-      ];
-
-      stepProgression.forEach((item, index) => {
-        if (index < stepProgression.length - 1) {
-          expect(item.progress).toBeLessThan(stepProgression[index + 1].progress);
-        }
-      });
-    });
-  });
-
-  describe('Status Messages', () => {
-    function getStatusMessage(stepIndex) {
-      const messages = [
-        'Downloading video content...',
-        'Analyzing and transcribing...',
-        'Formatting recipe data...',
-      ];
-      return messages[stepIndex] || null;
-    }
-
-    test('should provide status message for extracting step', () => {
-      const message = getStatusMessage(0);
-      expect(message).toBe('Downloading video content...');
-    });
-
-    test('should provide status message for processing step', () => {
-      const message = getStatusMessage(1);
-      expect(message).toBe('Analyzing and transcribing...');
-    });
-
-    test('should provide status message for formatting step', () => {
-      const message = getStatusMessage(2);
-      expect(message).toBe('Formatting recipe data...');
-    });
-
-    test('should handle invalid step index', () => {
-      const message = getStatusMessage(999);
-      expect(message).toBeNull();
-    });
-
-    test('should have unique status messages', () => {
-      const messages = [0, 1, 2].map((i) => getStatusMessage(i));
-      const uniqueMessages = new Set(messages);
-
-      expect(uniqueMessages.size).toBe(3);
-    });
-  });
-
   describe('Completion States', () => {
-    test('should identify extraction as not complete', () => {
-      const stepIndex = 0;
-      const isComplete = stepIndex === STEPS.length - 1;
-
-      expect(isComplete).toBe(false);
+    test('should show completion banner when all terminal and some completed', () => {
+      const steps = [
+        { name: 'Fetching video info', status: 'completed' },
+        { name: 'Checking description', status: 'completed' },
+        { name: 'Extracting captions', status: 'skipped' },
+        { name: 'Checking linked sites', status: 'skipped' },
+      ];
+      const isActive = false;
+      const showBanner = !isActive && allTerminal(steps) && steps.some(s => s.status === 'completed');
+      expect(showBanner).toBe(true);
     });
 
-    test('should identify processing as not complete', () => {
-      const stepIndex = 1;
-      const isComplete = stepIndex === STEPS.length - 1;
-
-      expect(isComplete).toBe(false);
+    test('should not show completion banner when still active', () => {
+      const steps = [
+        { name: 'Fetching video info', status: 'completed' },
+        { name: 'Checking description', status: 'in-progress' },
+        { name: 'Extracting captions', status: 'pending' },
+        { name: 'Checking linked sites', status: 'pending' },
+      ];
+      const isActive = true;
+      const showBanner = !isActive && allTerminal(steps) && steps.some(s => s.status === 'completed');
+      expect(showBanner).toBe(false);
     });
 
-    test('should identify formatting as complete', () => {
-      const stepIndex = 2;
-      const isComplete = stepIndex === STEPS.length - 1;
-
-      expect(isComplete).toBe(true);
+    test('should not show completion banner when all failed', () => {
+      const steps = [
+        { name: 'Fetching video info', status: 'failed' },
+        { name: 'Checking description', status: 'failed' },
+        { name: 'Extracting captions', status: 'failed' },
+        { name: 'Checking linked sites', status: 'failed' },
+      ];
+      const isActive = false;
+      const showBanner = !isActive && allTerminal(steps) && steps.some(s => s.status === 'completed');
+      expect(showBanner).toBe(false);
     });
 
     test('should identify completion at 100% progress', () => {
       const progress = 100;
-      const isComplete = progress >= 100;
-
-      expect(isComplete).toBe(true);
+      expect(progress >= 100).toBe(true);
     });
 
     test('should not identify incomplete at 99% progress', () => {
       const progress = 99;
-      const isComplete = progress >= 100;
-
-      expect(isComplete).toBe(false);
+      expect(progress >= 100).toBe(false);
     });
   });
 
@@ -346,99 +423,70 @@ describe('TranscriptionProgress Logic', () => {
     test('should transition from active to inactive', () => {
       let isActive = true;
       isActive = false;
-
       expect(isActive).toBe(false);
     });
 
-    test('should maintain active state during progress', () => {
-      let isActive = true;
-      const progress = 50;
-
-      expect(isActive).toBe(true);
-      expect(progress).toBe(50);
-    });
-
-    test('should show cancel button only when active', () => {
+    test('should show cancel button only when active and cancelable', () => {
       const isActive = true;
       const cancelable = true;
-
       expect(isActive && cancelable).toBe(true);
     });
 
     test('should hide cancel button when inactive', () => {
       const isActive = false;
       const cancelable = true;
-
       expect(isActive && cancelable).toBe(false);
-    });
-
-    test('should show completion banner when complete and inactive', () => {
-      const isActive = false;
-      const stepIndex = 2; // Last step
-
-      const showCompletion = !isActive && stepIndex === STEPS.length - 1;
-      expect(showCompletion).toBe(true);
-    });
-  });
-
-  describe('Props Validation', () => {
-    test('should have default currentStep as extracting', () => {
-      const defaultStep = 'extracting';
-      expect(defaultStep).toBe('extracting');
-    });
-
-    test('should have default progress as 0', () => {
-      const defaultProgress = 0;
-      expect(defaultProgress).toBe(0);
-    });
-
-    test('should have default isActive as true', () => {
-      const defaultActive = true;
-      expect(defaultActive).toBe(true);
     });
 
     test('should accept custom onCancel callback', () => {
       const onCancel = jest.fn();
       onCancel();
-
       expect(onCancel).toHaveBeenCalled();
+    });
+  });
+
+  describe('Props Validation', () => {
+    test('should have default steps as empty array', () => {
+      const defaultSteps = [];
+      expect(defaultSteps).toEqual([]);
+    });
+
+    test('should have default progress as 0', () => {
+      expect(0).toBe(0);
+    });
+
+    test('should have default isActive as true', () => {
+      expect(true).toBe(true);
     });
 
     test('should accept elapsedTime prop', () => {
-      const elapsedTime = 30;
-      expect(elapsedTime).toBe(30);
+      expect(30).toBe(30);
     });
 
     test('should accept estimatedTime prop', () => {
-      const estimatedTime = 120;
-      expect(estimatedTime).toBe(120);
+      expect(120).toBe(120);
     });
 
     test('should accept showSteps prop', () => {
-      const showSteps = false;
-      expect(showSteps).toBe(false);
+      expect(false).toBe(false);
     });
 
     test('should accept showProgressBar prop', () => {
-      const showProgressBar = false;
-      expect(showProgressBar).toBe(false);
+      expect(false).toBe(false);
     });
 
     test('should accept cancelable prop', () => {
-      const cancelable = false;
-      expect(cancelable).toBe(false);
+      expect(false).toBe(false);
     });
   });
 
   describe('Edge Cases', () => {
     test('should handle zero elapsed time', () => {
-      const elapsedTime = 0;
-      expect(formatTime(elapsedTime)).toBe('0s');
+      expect(formatTime(0)).toBe('0s');
     });
 
     test('should handle very large elapsed time', () => {
-      const elapsedTime = 36000; // 10 hours
-      expect(() => formatTime(elapsedTime)).not.toThrow();
+      expect(() => formatTime(36000)).not.toThrow();
     });
 
     test('should handle progress boundary at 0%', () => {
@@ -466,7 +514,6 @@ describe('TranscriptionProgress Logic', () => {
     test('should handle null estimated time gracefully', () => {
       const estimatedTime = null;
       const remaining = estimatedTime ? 30 - 10 : null;
-
       expect(remaining).toBeNull();
     });
 
@@ -476,6 +523,12 @@ describe('TranscriptionProgress Logic', () => {
         expect(p).toBeGreaterThanOrEqual(0);
         expect(p).toBeLessThanOrEqual(100);
       });
+    });
+
+    test('should handle empty steps array', () => {
+      const steps = [];
+      expect(getActiveStep(steps)).toBeNull();
+      expect(allTerminal(steps)).toBe(false);
     });
   });
 });
