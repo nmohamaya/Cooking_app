@@ -30,7 +30,6 @@ const VideoRecipeExtractionWorkflow = ({
 }) => {
   const [step, setStep] = useState('input'); // 'input', 'progress', 'preview'
   const [url, setUrl] = useState('');
-  const [isValidUrl, setIsValidUrl] = useState(false);
   const [extractedRecipe, setExtractedRecipe] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractionSteps, setExtractionSteps] = useState([]);
@@ -39,6 +38,7 @@ const VideoRecipeExtractionWorkflow = ({
   const [elapsedTime, setElapsedTime] = useState(0);
   const [extractionSource, setExtractionSource] = useState(null);
   const jobIdRef = useRef(null);
+  const cancelledRef = useRef(false);
 
   // Elapsed time timer
   useEffect(() => {
@@ -71,16 +71,24 @@ const VideoRecipeExtractionWorkflow = ({
     setError(null);
     setExtractionSource(null);
     jobIdRef.current = null;
+    cancelledRef.current = false;
 
     try {
       console.log('Starting video extraction for URL:', targetUrl);
 
       const result = await extractViaApi(targetUrl, {
         language: 'en',
-        onStepUpdate: (steps) => setExtractionSteps(steps),
-        onProgress: (p) => setProgress(p),
+        onStepUpdate: (steps) => {
+          if (!cancelledRef.current) setExtractionSteps(steps);
+        },
+        onProgress: (p) => {
+          if (!cancelledRef.current) setProgress(p);
+        },
         onJobCreated: (id) => { jobIdRef.current = id; },
       });
+
+      // Ignore results if user cancelled during extraction
+      if (cancelledRef.current) return;
 
       if (result.success && result.recipe) {
         console.log('Recipe extracted from:', result.source, '- Title:', result.recipe.title);
@@ -92,6 +100,9 @@ const VideoRecipeExtractionWorkflow = ({
         throw new Error('No recipe could be extracted from this video.');
       }
     } catch (err) {
+      // Ignore errors if user cancelled during extraction
+      if (cancelledRef.current) return;
+
       console.error('Extraction failed:', err.message);
       const errorMessage = formatErrorMessage(err);
       setError(errorMessage);
@@ -103,11 +114,17 @@ const VideoRecipeExtractionWorkflow = ({
   /**
    * Format error message with attempt details when available
    */
+  const SOURCE_LABELS = {
+    'description': 'Description',
+    'transcript': 'Transcript',
+    'linked-url': 'Linked site',
+    'linked-urls': 'Linked sites',
+  };
+
   const formatErrorMessage = (err) => {
     if (err.attempts && Array.isArray(err.attempts)) {
       const details = err.attempts.map(a => {
-        const name = a.source.replace('linked-url', 'Linked sites').replace('linked-urls', 'Linked sites');
-        const label = name.charAt(0).toUpperCase() + name.slice(1);
+        const label = SOURCE_LABELS[a.source] || (a.source.charAt(0).toUpperCase() + a.source.slice(1));
         if (a.status === 'tried') return `${label}: no recipe found`;
         if (a.status === 'skipped') return `${label}: ${a.reason || 'skipped'}`;
         if (a.status === 'insufficient') return `${label}: content too short`;
@@ -119,6 +136,7 @@ const VideoRecipeExtractionWorkflow = ({
   };
 
   const handleCancel = () => {
+    cancelledRef.current = true;
     if (jobIdRef.current) {
       cancelExtraction(jobIdRef.current);
     }
@@ -162,7 +180,6 @@ const VideoRecipeExtractionWorkflow = ({
           setStep('input');
           setExtractedRecipe(null);
           setUrl('');
-          setIsValidUrl(false);
         },
       },
     ]);
@@ -220,7 +237,11 @@ const VideoRecipeExtractionWorkflow = ({
 
             <VideoRecipeInput
               onVideoSelected={(video) => handleUrlChange(video?.url ?? '')}
-              onExtractStart={() => {}}
+              onExtractStart={() => {
+                setError(null);
+                setIsProcessing(true);
+                setStep('progress');
+              }}
               onExtractSuccess={async (data) => {
                 await handleStartExtraction(data?.url);
               }}
