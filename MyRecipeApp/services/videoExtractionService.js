@@ -20,7 +20,7 @@ const MAX_POLL_ATTEMPTS = 120; // 3 minutes max (120 * 1.5s)
  * @returns {Promise<object>} Extraction result with recipe
  */
 export async function extractRecipeFromVideo(url, options = {}) {
-  const { language = 'en', onStepUpdate, onProgress } = options;
+  const { language = 'en', onStepUpdate, onProgress, onJobCreated } = options;
 
   // Step 1: Queue the extraction job
   const response = await fetch(`${API_BASE}/extract`, {
@@ -35,6 +35,8 @@ export async function extractRecipeFromVideo(url, options = {}) {
   }
 
   const { jobId } = await response.json();
+
+  if (onJobCreated) onJobCreated(jobId);
 
   // Step 2: Poll for result
   return pollForResult(jobId, { onStepUpdate, onProgress });

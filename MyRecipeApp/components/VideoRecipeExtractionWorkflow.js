@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,7 @@ import {
 import VideoRecipeInput from './VideoRecipeInput';
 import TranscriptionProgress from './TranscriptionProgress';
 import RecipePreviewModal from './RecipePreviewModal';
-import urlValidator from '../utils/urlValidator';
-import { getYoutubeTranscript } from '../services/youtubeExtractorService';
-import { getTikTokContent } from '../services/socialMediaExtractorService';
-import { getInstagramContent } from '../services/socialMediaExtractorService';
-import { extractRecipeFromText } from '../services/recipeExtraction';
+import { extractRecipeFromVideo as extractViaApi, cancelExtraction } from '../services/videoExtractionService';
 
 /**
  * VideoRecipeExtractionWorkflow Component
@@ -24,8 +20,8 @@ import { extractRecipeFromText } from '../services/recipeExtraction';
  * 2. TranscriptionProgress - Shows extraction progress
  * 3. RecipePreviewModal - Display and edit extracted recipe
  *
- * Integrates all Phase 5 UI components into a seamless workflow
- * for extracting recipes from video URLs.
+ * Uses the backend /api/extract endpoint which implements a fallback cascade:
+ * description → transcript → linked websites
  */
 const VideoRecipeExtractionWorkflow = ({
   visible,
@@ -34,151 +30,129 @@ const VideoRecipeExtractionWorkflow = ({
 }) => {
   const [step, setStep] = useState('input'); // 'input', 'progress', 'preview'
   const [url, setUrl] = useState('');
-  const [isValidUrl, setIsValidUrl] = useState(false);
   const [extractedRecipe, setExtractedRecipe] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progressStep, setProgressStep] = useState(1);
+  const [extractionSteps, setExtractionSteps] = useState([]);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [extractionSource, setExtractionSource] = useState(null);
+  const jobIdRef = useRef(null);
+  const cancelledRef = useRef(false);
 
-  const progressSteps = [
-    { id: 1, label: 'Downloading video', icon: '📥' },
-    { id: 2, label: 'Extracting audio', icon: '🎵' },
-    { id: 3, label: 'Processing with AI', icon: '🤖' },
-  ];
+  // Elapsed time timer
+  useEffect(() => {
+    let timer;
+    if (isProcessing) {
+      timer = setInterval(() => setElapsedTime(t => t + 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isProcessing]);
 
   const handleUrlChange = (newUrl) => {
     setUrl(newUrl);
-    // Validate URL with urlValidator utility
-    const isValid = urlValidator.isValidVideoUrl(newUrl);
-    setIsValidUrl(isValid);
     setError(null);
   };
 
-  const handleStartExtraction = async () => {
-    if (!url.trim()) {
-      setError('Please enter a URL');
-      return;
-    }
+  const handleStartExtraction = async (videoUrl) => {
+    const targetUrl = (videoUrl || url || '').trim();
 
-    if (!isValidUrl) {
-      setError('Invalid URL. Please enter a valid video URL');
+    if (!targetUrl) {
+      setError('Please enter a URL');
       return;
     }
 
     // Move to progress screen
     setStep('progress');
     setIsProcessing(true);
-    setProgressStep(1);
+    setExtractionSteps([]);
+    setProgress(0);
+    setElapsedTime(0);
     setError(null);
+    setExtractionSource(null);
+    jobIdRef.current = null;
+    cancelledRef.current = false;
 
     try {
-      // Real extraction workflow
-      await extractRecipeFromVideo();
+      console.log('Starting video extraction for URL:', targetUrl);
+
+      const result = await extractViaApi(targetUrl, {
+        language: 'en',
+        onStepUpdate: (steps) => {
+          if (!cancelledRef.current) setExtractionSteps(steps);
+        },
+        onProgress: (p) => {
+          if (!cancelledRef.current) setProgress(p);
+        },
+        onJobCreated: (id) => { jobIdRef.current = id; },
+      });
+
+      // Ignore results if user cancelled during extraction
+      if (cancelledRef.current) return;
+
+      if (result.success && result.recipe) {
+        console.log('Recipe extracted from:', result.source, '- Title:', result.recipe.title);
+        setExtractionSource(result.source);
+        setExtractedRecipe(result.recipe);
+        setIsProcessing(false);
+        setStep('preview');
+      } else {
+        throw new Error('No recipe could be extracted from this video.');
+      }
     } catch (err) {
-      const errorMessage = err.message || 'Failed to extract recipe from video';
-      console.error('🚨 Extraction failed with error:', errorMessage);
+      // Ignore errors if user cancelled during extraction
+      if (cancelledRef.current) return;
+
+      console.error('Extraction failed:', err.message);
+      const errorMessage = formatErrorMessage(err);
       setError(errorMessage);
       setIsProcessing(false);
       setStep('input');
     }
   };
 
-  const extractRecipeFromVideo = async (videoUrl) => {
-    const targetUrl = videoUrl || url;
-    try {
-      // Step 1: Get video transcript based on URL platform
-      console.log('🎬 Starting video extraction for URL:', targetUrl);
-      setProgressStep(1);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+  /**
+   * Format error message with attempt details when available
+   */
+  const SOURCE_LABELS = {
+    'description': 'Description',
+    'transcript': 'Transcript',
+    'linked-url': 'Linked site',
+    'linked-urls': 'Linked sites',
+  };
 
-      const provider = urlValidator.getVideoProvider(targetUrl);
-      const videoId = urlValidator.extractVideoId(targetUrl);
-
-      console.log('📺 Detected provider:', provider, 'Video ID:', videoId);
-
-      if (!videoId) {
-        throw new Error(`Could not extract video ID from ${provider} URL`);
-      }
-
-      let transcript = null;
-
-      // Fetch transcript based on platform
-      if (provider === 'youtube') {
-        console.log('📥 Fetching YouTube transcript...');
-        const result = await getYoutubeTranscript(videoId, 'en');
-        console.log('YouTube result:', result);
-        if (!result.success) {
-          throw new Error(`YouTube: ${result.error || 'Could not retrieve video transcript'}`);
-        }
-        transcript = result.transcript;
-      } else if (provider === 'tiktok') {
-        console.log('📥 Fetching TikTok content...');
-        const result = await getTikTokContent(videoId);
-        console.log('TikTok result:', result);
-        if (!result.success) {
-          throw new Error(`TikTok: ${result.error || 'Could not retrieve video content'}`);
-        }
-        transcript = result.content;
-      } else if (provider === 'instagram') {
-        console.log('📥 Fetching Instagram content...');
-        const result = await getInstagramContent(videoId);
-        console.log('Instagram result:', result);
-        if (!result.success) {
-          throw new Error(`Instagram: ${result.error || 'Could not retrieve post content'}`);
-        }
-        transcript = result.content;
-      } else if (provider === 'twitter' || provider === 'facebook') {
-        throw new Error(`${provider} extraction is not yet supported. Currently supporting: YouTube, TikTok, Instagram`);
-      } else {
-        throw new Error(`Unsupported platform: ${provider}`);
-      }
-
-      // Check for missing or useless transcripts (e.g., just [Music] tags and single letters)
-      const cleanedTranscript = (transcript || '').replace(/\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
-      if (!transcript || cleanedTranscript.length < 50) {
-        throw new Error(
-          `No meaningful transcript found for this ${provider} video. ` +
-          `The video may only contain music without spoken words. ` +
-          `Please try a video where the chef narrates the recipe.`
-        );
-      }
-
-      console.log('✅ Transcript obtained, length:', transcript.length, 'chars');
-
-      // Step 2: Extract audio (simulated - shows progress)
-      setProgressStep(2);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Step 3: Process with AI
-      setProgressStep(3);
-      console.log('🤖 Sending transcript to AI for recipe extraction...');
-      
-      const recipe = await extractRecipeFromText(transcript);
-      console.log('🔍 AI extraction result:', recipe);
-
-      if (!recipe || !recipe.title) {
-        throw new Error(
-          'The AI could not identify a recipe in this video. ' +
-          'Please ensure the video contains clear cooking instructions. ' +
-          'Try a different video that focuses on recipe preparation.'
-        );
-      }
-
-      console.log('✨ Recipe successfully extracted:', recipe.title);
-      setExtractedRecipe(recipe);
-      setIsProcessing(false);
-      setStep('preview');
-    } catch (err) {
-      console.error('❌ Video extraction error:', err);
-      throw err;
+  const formatErrorMessage = (err) => {
+    if (err.attempts && Array.isArray(err.attempts)) {
+      const details = err.attempts.map(a => {
+        const label = SOURCE_LABELS[a.source] || (a.source.charAt(0).toUpperCase() + a.source.slice(1));
+        if (a.status === 'tried') return `${label}: no recipe found`;
+        if (a.status === 'skipped') return `${label}: ${a.reason || 'skipped'}`;
+        if (a.status === 'insufficient') return `${label}: content too short`;
+        return `${label}: ${a.status}`;
+      }).join(', ');
+      return `Could not extract a recipe. Tried: ${details}. Try a different video.`;
     }
+    return err.message || 'Failed to extract recipe from video';
+  };
+
+  const handleCancel = () => {
+    cancelledRef.current = true;
+    if (jobIdRef.current) {
+      cancelExtraction(jobIdRef.current);
+    }
+    setIsProcessing(false);
+    setStep('input');
+    jobIdRef.current = null;
+    setExtractionSteps([]);
+    setProgress(0);
+    setElapsedTime(0);
   };
 
   const handleRecipeUse = (recipe) => {
-    // Format recipe for AddRecipeScreen
+    // Format recipe for AddRecipeScreen — normalize to strings
     const formattedRecipe = {
       title: recipe.title || '',
-      category: '', // Could be extracted from tags/metadata
+      category: recipe.category || '',
       ingredients: Array.isArray(recipe.ingredients)
         ? recipe.ingredients.join('\n')
         : recipe.ingredients || '',
@@ -186,19 +160,15 @@ const VideoRecipeExtractionWorkflow = ({
         ? recipe.instructions.join('\n\n')
         : recipe.instructions || '',
       prepTime: recipe.prepTime || '',
-      cookTime: recipe.duration || '',
+      cookTime: recipe.cookTime || recipe.duration || '',
     };
 
-    // Callback to AddRecipeScreen
     onExtractComplete(formattedRecipe);
-
-    // Close workflow
     handleClose();
   };
 
   const handleRecipeEdit = () => {
-    // For now, just allow editing in the preview modal
-    // In future, could open edit screen
+    // Allow editing in the preview modal
   };
 
   const handleRecipeDiscard = () => {
@@ -210,25 +180,30 @@ const VideoRecipeExtractionWorkflow = ({
           setStep('input');
           setExtractedRecipe(null);
           setUrl('');
-          setIsValidUrl(false);
         },
       },
     ]);
   };
 
   const handleRecipeSave = (updatedRecipe) => {
-    // Update recipe in preview
     setExtractedRecipe(updatedRecipe);
   };
 
   const handleClose = () => {
+    if (isProcessing) {
+      handleCancel();
+    }
     setStep('input');
     setUrl('');
     setIsValidUrl(false);
     setExtractedRecipe(null);
     setIsProcessing(false);
-    setProgressStep(1);
+    setExtractionSteps([]);
+    setProgress(0);
+    setElapsedTime(0);
     setError(null);
+    setExtractionSource(null);
+    jobIdRef.current = null;
     onClose();
   };
 
@@ -263,20 +238,12 @@ const VideoRecipeExtractionWorkflow = ({
             <VideoRecipeInput
               onVideoSelected={(video) => handleUrlChange(video?.url ?? '')}
               onExtractStart={() => {
+                setError(null);
                 setIsProcessing(true);
                 setStep('progress');
-                setProgressStep(1);
-                setError(null);
               }}
               onExtractSuccess={async (data) => {
-                // Trigger the extraction workflow
-                try {
-                  await extractRecipeFromVideo(data?.url);
-                } catch (err) {
-                  setError(err.message || 'Failed to extract recipe from video');
-                  setIsProcessing(false);
-                  setStep('input');
-                }
+                await handleStartExtraction(data?.url);
               }}
               onExtractError={(errorInfo) => {
                 setError(errorInfo.message || 'Failed to extract recipe');
@@ -302,10 +269,18 @@ const VideoRecipeExtractionWorkflow = ({
           <View style={styles.content}>
             <Text style={styles.stepTitle}>Step 2: Processing Video</Text>
             <TranscriptionProgress
-              steps={progressSteps}
-              currentStep={progressStep}
-              isLoading={isProcessing}
+              steps={extractionSteps}
+              progress={progress}
+              isActive={isProcessing}
+              onCancel={handleCancel}
+              elapsedTime={elapsedTime}
+              cancelable={true}
             />
+            {extractionSource && (
+              <Text style={styles.sourceText}>
+                Recipe found via: {extractionSource}
+              </Text>
+            )}
             <Text style={styles.processingText}>
               Please wait while we extract the recipe from the video...
             </Text>
@@ -386,23 +361,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#d32f2f',
   },
-  nextButton: {
-    backgroundColor: '#1976D2',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 6,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  buttonDisabled: {
-    backgroundColor: '#bdbdbd',
-    opacity: 0.6,
-  },
-  nextButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   supportedPlatforms: {
     marginTop: 40,
     paddingTop: 30,
@@ -426,6 +384,13 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 20,
+  },
+  sourceText: {
+    fontSize: 13,
+    color: '#4CAF50',
+    textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '500',
   },
 });
 
