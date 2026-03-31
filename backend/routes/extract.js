@@ -68,9 +68,9 @@ router.post('/', async (req, res) => {
       progress: 0,
       steps: [
         { name: 'Fetching video info', status: 'pending' },
+        { name: 'Checking linked sites', status: 'pending' },
         { name: 'Checking description', status: 'pending' },
         { name: 'Extracting captions', status: 'pending' },
-        { name: 'Checking linked sites', status: 'pending' },
       ],
       result: null,
       error: null,

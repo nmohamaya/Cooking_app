@@ -3,11 +3,13 @@
  *
  * Implements the fallback cascade for extracting recipes from video URLs.
  * Priority order:
- *   1. Video description (via yt-dlp metadata)
- *   2. Subtitles/captions (via yt-dlp subtitle extraction)
- *   3. Links in description (scrape recipe websites)
+ *   1. Linked URLs in description (structured recipe data from websites)
+ *   2. Video description text (via AI extraction)
+ *   3. Subtitles/captions (via AI extraction)
  *
- * Levels 1 and 2 run in parallel, results processed in priority order.
+ * Linked URLs are tried first when present because structured website data
+ * (JSON-LD, microdata) is more reliable than parsing informal description text.
+ * Levels 1 (metadata) and transcript fetch run in parallel.
  */
 
 const logger = require('../config/logger');
@@ -70,10 +72,63 @@ async function extractRecipeFromVideo(url, options = {}) {
 
     updateStep('Fetching video info', 'completed');
 
-    // Phase 2: Try description (Level 1)
+    // Analyze description once — used by both linked sites and description phases
+    const analysis = (metadata && metadata.description)
+      ? descriptionAnalyzer.analyze(metadata.description)
+      : { hasRecipeContent: false, recipeText: '', linkedUrls: [], confidence: 0 };
+
+    // Phase 2: Try linked URLs first (structured website data is most reliable)
+    if (analysis.linkedUrls.length > 0) {
+      updateStep('Checking linked sites', 'in-progress');
+
+      const urlsToTry = analysis.linkedUrls.slice(0, 3); // Max 3 links
+
+      for (const linkedUrl of urlsToTry) {
+        result.attempts.push({ source: 'linked-url', url: linkedUrl, status: 'tried' });
+
+        const scraped = await linkScraper.scrapeRecipe(linkedUrl);
+
+        if (scraped.success && scraped.recipe) {
+          // If scraper returned structured data, check if it's complete enough
+          if (scraped.recipe.title && (scraped.recipe.ingredients || scraped.recipe.instructions)) {
+            if (aiExtraction.isValidRecipe(scraped.recipe)) {
+              result.success = true;
+              result.recipe = aiExtraction.normalizeRecipe(scraped.recipe);
+              result.source = `linked-url:${scraped.source}`;
+              const hostname = safeHostname(linkedUrl);
+              updateStep('Checking linked sites', 'completed', `Recipe found on ${hostname}`);
+              logger.info('Recipe extracted from linked URL', { url, linkedUrl, source: scraped.source });
+              return result;
+            }
+          }
+
+          // Raw content — send to AI for extraction
+          const rawText = `Title: ${scraped.recipe.title}\nIngredients:\n${scraped.recipe.ingredients}\nInstructions:\n${scraped.recipe.instructions}`;
+          try {
+            const recipe = await aiExtraction.extractRecipe(rawText, 'scraped');
+            if (aiExtraction.isValidRecipe(recipe)) {
+              result.success = true;
+              result.recipe = recipe;
+              result.source = `linked-url:${scraped.source}`;
+              updateStep('Checking linked sites', 'completed', `Recipe found on ${safeHostname(linkedUrl)}`);
+              logger.info('Recipe extracted from linked URL via AI', { url, linkedUrl });
+              return result;
+            }
+          } catch (err) {
+            logger.warn('AI extraction from scraped content failed', { linkedUrl, error: err.message });
+          }
+        }
+      }
+
+      updateStep('Checking linked sites', 'completed', 'No recipe found in linked sites');
+    } else {
+      updateStep('Checking linked sites', 'skipped', 'No links in description');
+      result.attempts.push({ source: 'linked-urls', status: 'skipped', reason: 'no links found' });
+    }
+
+    // Phase 3: Try description text via AI (Level 2)
     if (metadata && metadata.description) {
       updateStep('Checking description', 'in-progress');
-      const analysis = descriptionAnalyzer.analyze(metadata.description);
 
       if (analysis.hasRecipeContent) {
         result.attempts.push({ source: 'description', status: 'tried' });
@@ -104,7 +159,7 @@ async function extractRecipeFromVideo(url, options = {}) {
       result.attempts.push({ source: 'description', status: 'skipped', reason: 'no description' });
     }
 
-    // Phase 3: Try transcript (Level 2)
+    // Phase 4: Try transcript (Level 3)
     if (transcript && transcript.text) {
       updateStep('Extracting captions', 'in-progress');
 
@@ -143,60 +198,6 @@ async function extractRecipeFromVideo(url, options = {}) {
         : 'no transcript';
       updateStep('Extracting captions', 'skipped', reason);
       result.attempts.push({ source: 'transcript', status: 'skipped', reason });
-    }
-
-    // Phase 4: Try linked URLs from description (Level 3)
-    const descAnalysis = metadata?.description
-      ? descriptionAnalyzer.analyze(metadata.description)
-      : { linkedUrls: [] };
-
-    if (descAnalysis.linkedUrls.length > 0) {
-      updateStep('Checking linked sites', 'in-progress');
-
-      const urlsToTry = descAnalysis.linkedUrls.slice(0, 3); // Max 3 links
-
-      for (const linkedUrl of urlsToTry) {
-        result.attempts.push({ source: 'linked-url', url: linkedUrl, status: 'tried' });
-
-        const scraped = await linkScraper.scrapeRecipe(linkedUrl);
-
-        if (scraped.success && scraped.recipe) {
-          // If scraper returned structured data, check if it's complete enough
-          if (scraped.recipe.title && (scraped.recipe.ingredients || scraped.recipe.instructions)) {
-            // Structured data is already a recipe — use it directly or enhance with AI
-            if (aiExtraction.isValidRecipe(scraped.recipe)) {
-              result.success = true;
-              result.recipe = aiExtraction.normalizeRecipe(scraped.recipe);
-              result.source = `linked-url:${scraped.source}`;
-              const hostname = safeHostname(linkedUrl);
-              updateStep('Checking linked sites', 'completed', `Recipe found on ${hostname}`);
-              logger.info('Recipe extracted from linked URL', { url, linkedUrl, source: scraped.source });
-              return result;
-            }
-          }
-
-          // Raw content — send to AI for extraction
-          const rawText = `Title: ${scraped.recipe.title}\nIngredients:\n${scraped.recipe.ingredients}\nInstructions:\n${scraped.recipe.instructions}`;
-          try {
-            const recipe = await aiExtraction.extractRecipe(rawText, 'scraped');
-            if (aiExtraction.isValidRecipe(recipe)) {
-              result.success = true;
-              result.recipe = recipe;
-              result.source = `linked-url:${scraped.source}`;
-              updateStep('Checking linked sites', 'completed', `Recipe found on ${safeHostname(linkedUrl)}`);
-              logger.info('Recipe extracted from linked URL via AI', { url, linkedUrl });
-              return result;
-            }
-          } catch (err) {
-            logger.warn('AI extraction from scraped content failed', { linkedUrl, error: err.message });
-          }
-        }
-      }
-
-      updateStep('Checking linked sites', 'completed', 'No recipe found in linked sites');
-    } else {
-      updateStep('Checking linked sites', 'skipped', 'No links in description');
-      result.attempts.push({ source: 'linked-urls', status: 'skipped', reason: 'no links found' });
     }
 
     // All sources exhausted
