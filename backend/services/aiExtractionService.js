@@ -1,15 +1,18 @@
 /**
  * AI Extraction Service
  *
- * Wraps GPT-4o calls via GitHub Models API with source-type-specific prompts.
+ * Wraps AI model calls via GitHub Models API with source-type-specific prompts.
  * Handles recipe extraction from descriptions, transcripts, and scraped content.
+ *
+ * Model is configurable via AI_MODEL env var (default: gpt-4o).
+ * API URL is configurable via AI_API_URL env var.
  */
 
 const axios = require('axios');
 const logger = require('../config/logger');
 
-const API_URL = 'https://models.inference.ai.azure.com';
-const MODEL_NAME = 'gpt-4o';
+const API_URL = process.env.AI_API_URL || 'https://models.inference.ai.azure.com';
+const MODEL_NAME = process.env.AI_MODEL || 'gpt-4o';
 const EXTRACTION_TIMEOUT = 15000; // 15 seconds
 
 // Valid categories matching the frontend App.js CATEGORIES constant
@@ -42,6 +45,7 @@ Return JSON with these fields:
 - instructions: string (numbered steps)
 - prepTime: string (e.g., "15 minutes")
 - cookTime: string (e.g., "30 minutes")
+- servings: string (e.g., "4 servings")
 
 If multiple categories apply, choose the most specific one. If unsure, use "Dinner" as default.
 If any field is not mentioned, use empty string. Be concise and clear.`,
@@ -53,6 +57,7 @@ If any field is not mentioned, use empty string. Be concise and clear.`,
 - instructions: string (numbered steps)
 - prepTime: string (e.g., "15 minutes")
 - cookTime: string (e.g., "30 minutes")
+- servings: string (e.g., "4 servings")
 
 For category, analyze the recipe content to determine the best fit:
 - Use "Breakfast" for morning meals (pancakes, eggs, oatmeal, etc.)
@@ -76,6 +81,7 @@ Return JSON with these fields:
 - instructions: string (numbered steps)
 - prepTime: string (e.g., "15 minutes")
 - cookTime: string (e.g., "30 minutes")
+- servings: string (e.g., "4 servings")
 
 If multiple categories apply, choose the most specific one. If unsure, use "Dinner" as default.
 If any field is not mentioned, use empty string. Be concise and clear.`,
@@ -89,6 +95,7 @@ Return JSON with these fields:
 - instructions: string (numbered steps)
 - prepTime: string (e.g., "15 minutes")
 - cookTime: string (e.g., "30 minutes")
+- servings: string (e.g., "4 servings")
 
 If multiple categories apply, choose the most specific one. If unsure, use "Dinner" as default.
 If any field is not mentioned, use empty string. Be concise and clear.`,
@@ -184,7 +191,7 @@ async function extractRecipe(text, sourceType = 'transcript') {
  * @returns {object} Normalized recipe
  */
 function normalizeRecipe(recipe) {
-  if (!recipe) return { title: '', category: 'Dinner', ingredients: '', instructions: '', prepTime: '', cookTime: '' };
+  if (!recipe) return { title: '', category: 'Dinner', ingredients: '', instructions: '', prepTime: '', cookTime: '', servings: '' };
   const title = String(recipe.title || '').trim();
   const ingredients = String(recipe.ingredients || '').trim();
   const instructions = String(recipe.instructions || '').trim();
@@ -202,6 +209,7 @@ function normalizeRecipe(recipe) {
     instructions,
     prepTime: String(recipe.prepTime || '').trim(),
     cookTime: String(recipe.cookTime || '').trim(),
+    servings: String(recipe.servings || '').trim(),
   };
 }
 

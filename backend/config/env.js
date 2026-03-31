@@ -24,6 +24,10 @@ module.exports = {
   costTrackingEnabled: process.env.COST_TRACKING_ENABLED === 'true',
   costAlertThreshold: parseFloat(process.env.COST_ALERT_THRESHOLD || '1.00'),
   
+  // AI Model Configuration
+  aiModel: process.env.AI_MODEL || 'gpt-4o',
+  aiApiUrl: process.env.AI_API_URL || 'https://models.inference.ai.azure.com',
+
   // API
   apiVersion: 'v1',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:8081'

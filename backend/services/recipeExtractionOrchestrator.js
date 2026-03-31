@@ -1,13 +1,22 @@
 /**
  * Recipe Extraction Orchestrator
  *
- * Implements the fallback cascade for extracting recipes from video URLs.
- * Priority order:
- *   1. Video description (via yt-dlp metadata)
- *   2. Subtitles/captions (via yt-dlp subtitle extraction)
- *   3. Links in description (scrape recipe websites)
+ * Implements a phased approach for extracting recipes from video URLs.
  *
- * Levels 1 and 2 run in parallel, results processed in priority order.
+ * Phase 1 (parallel, free, fast):
+ *   1. Linked URLs in description (structured recipe data from websites)
+ *   2. Video description text (via AI extraction)
+ *   3. Subtitles/captions (via AI extraction)
+ *
+ * All three run in parallel via Promise.allSettled(). The best result
+ * is selected using the recipe completeness scorer (0-12 scale).
+ *
+ * Phase boundaries:
+ *   - Score >= 9 (COMPLETE): Return immediately
+ *   - Score 5-8 (PARTIAL): Return result (future: optionally try Phase 2)
+ *   - Score 0-4 (INSUFFICIENT): Future Phase 2 (video frame analysis)
+ *
+ * Metadata and transcript are fetched in parallel before Phase 1 sources.
  */
 
 const logger = require('../config/logger');
@@ -17,12 +26,13 @@ const { generateUrlHash } = require('./cacheService');
 const descriptionAnalyzer = require('./descriptionAnalyzerService');
 const linkScraper = require('./linkScrapingService');
 const aiExtraction = require('./aiExtractionService');
+const { scoreRecipe, THRESHOLDS } = require('./recipeCompletenessScorer');
 
 // Minimum characters of real content for a transcript to be useful
 const MIN_TRANSCRIPT_LENGTH = 50;
 
 /**
- * Extract a recipe from a video URL using the fallback cascade
+ * Extract a recipe from a video URL using parallel Phase 1 sources
  * @param {string} url - Video URL
  * @param {object} options - Options
  * @param {string} options.language - Language code (default: 'en')
@@ -36,6 +46,7 @@ async function extractRecipeFromVideo(url, options = {}) {
     success: false,
     recipe: null,
     source: null,
+    completeness: null,
     attempts: [],
     metadata: null,
   };
@@ -47,7 +58,7 @@ async function extractRecipeFromVideo(url, options = {}) {
   };
 
   try {
-    // Phase 1: Parallel fetch — metadata (description) + subtitles
+    // Pre-phase: Parallel fetch — metadata (description) + subtitles
     updateStep('Fetching video info', 'in-progress');
 
     const cacheKey = generateUrlHash(url, language);
@@ -70,136 +81,60 @@ async function extractRecipeFromVideo(url, options = {}) {
 
     updateStep('Fetching video info', 'completed');
 
-    // Phase 2: Try description (Level 1)
-    if (metadata && metadata.description) {
-      updateStep('Checking description', 'in-progress');
-      const analysis = descriptionAnalyzer.analyze(metadata.description);
-
-      if (analysis.hasRecipeContent) {
-        result.attempts.push({ source: 'description', status: 'tried' });
-
-        try {
-          const recipe = await aiExtraction.extractRecipe(analysis.recipeText, 'description');
-
-          if (aiExtraction.isValidRecipe(recipe)) {
-            result.success = true;
-            result.recipe = recipe;
-            result.source = 'description';
-            updateStep('Checking description', 'completed', 'Recipe found in description');
-            logger.info('Recipe extracted from description', { url, title: recipe.title });
-            return result;
-          }
-        } catch (err) {
-          result.attempts[result.attempts.length - 1].error = err.message;
-          logger.warn('AI extraction from description failed', { url, error: err.message });
-        }
-      }
-
-      if (!result.attempts.some(a => a.source === 'description' && a.status === 'tried')) {
-        result.attempts.push({ source: 'description', status: 'no-recipe-content' });
-      }
-      updateStep('Checking description', 'completed', 'No recipe found');
-    } else {
-      updateStep('Checking description', 'skipped', 'No description available');
-      result.attempts.push({ source: 'description', status: 'skipped', reason: 'no description' });
-    }
-
-    // Phase 3: Try transcript (Level 2)
-    if (transcript && transcript.text) {
-      updateStep('Extracting captions', 'in-progress');
-
-      const cleanedTranscript = transcript.text
-        .replace(/\[.*?\]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-      if (cleanedTranscript.length >= MIN_TRANSCRIPT_LENGTH) {
-        result.attempts.push({ source: 'transcript', status: 'tried' });
-
-        try {
-          const recipe = await aiExtraction.extractRecipe(transcript.text, 'transcript');
-
-          if (aiExtraction.isValidRecipe(recipe)) {
-            result.success = true;
-            result.recipe = recipe;
-            result.source = 'transcript';
-            updateStep('Extracting captions', 'completed', 'Recipe found in captions');
-            logger.info('Recipe extracted from transcript', { url, title: recipe.title });
-            return result;
-          }
-        } catch (err) {
-          result.attempts[result.attempts.length - 1].error = err.message;
-          logger.warn('AI extraction from transcript failed', { url, error: err.message });
-        }
-
-        updateStep('Extracting captions', 'completed', 'Could not extract recipe from captions');
-      } else {
-        updateStep('Extracting captions', 'completed', 'No meaningful captions found');
-        result.attempts.push({ source: 'transcript', status: 'insufficient', length: cleanedTranscript.length });
-      }
-    } else {
-      const reason = transcriptResult.status === 'rejected'
-        ? transcriptResult.reason?.message || 'extraction failed'
-        : 'no transcript';
-      updateStep('Extracting captions', 'skipped', reason);
-      result.attempts.push({ source: 'transcript', status: 'skipped', reason });
-    }
-
-    // Phase 4: Try linked URLs from description (Level 3)
-    const descAnalysis = metadata?.description
+    // Analyze description once — used by both linked sites and description phases
+    const analysis = (metadata && metadata.description)
       ? descriptionAnalyzer.analyze(metadata.description)
-      : { linkedUrls: [] };
+      : { hasRecipeContent: false, recipeText: '', linkedUrls: [], confidence: 0 };
 
-    if (descAnalysis.linkedUrls.length > 0) {
-      updateStep('Checking linked sites', 'in-progress');
+    // Phase 1: Run all three sources in parallel
+    const [linkedResult, descriptionResultSettled, transcriptExtractResult] = await Promise.allSettled([
+      tryLinkedUrls(analysis, result, updateStep),
+      tryDescription(analysis, metadata, result, updateStep),
+      tryTranscript(transcript, transcriptResult, result, updateStep),
+    ]);
 
-      const urlsToTry = descAnalysis.linkedUrls.slice(0, 3); // Max 3 links
+    // Collect successful candidates and score them
+    const candidates = [linkedResult, descriptionResultSettled, transcriptExtractResult]
+      .filter(r => r.status === 'fulfilled' && r.value)
+      .map(r => r.value)
+      .sort((a, b) => b.score - a.score);
 
-      for (const linkedUrl of urlsToTry) {
-        result.attempts.push({ source: 'linked-url', url: linkedUrl, status: 'tried' });
+    if (candidates.length > 0 && candidates[0].score >= THRESHOLDS.PARTIAL) {
+      result.success = true;
+      result.recipe = candidates[0].recipe;
+      result.source = candidates[0].source;
+      result.completeness = candidates[0].score;
 
-        const scraped = await linkScraper.scrapeRecipe(linkedUrl);
+      logger.info('Recipe extracted (Phase 1)', {
+        url,
+        source: result.source,
+        completeness: result.completeness,
+        candidateCount: candidates.length,
+        scores: candidates.map(c => ({ source: c.source, score: c.score })),
+      });
 
-        if (scraped.success && scraped.recipe) {
-          // If scraper returned structured data, check if it's complete enough
-          if (scraped.recipe.title && (scraped.recipe.ingredients || scraped.recipe.instructions)) {
-            // Structured data is already a recipe — use it directly or enhance with AI
-            if (aiExtraction.isValidRecipe(scraped.recipe)) {
-              result.success = true;
-              result.recipe = aiExtraction.normalizeRecipe(scraped.recipe);
-              result.source = `linked-url:${scraped.source}`;
-              const hostname = safeHostname(linkedUrl);
-              updateStep('Checking linked sites', 'completed', `Recipe found on ${hostname}`);
-              logger.info('Recipe extracted from linked URL', { url, linkedUrl, source: scraped.source });
-              return result;
-            }
-          }
-
-          // Raw content — send to AI for extraction
-          const rawText = `Title: ${scraped.recipe.title}\nIngredients:\n${scraped.recipe.ingredients}\nInstructions:\n${scraped.recipe.instructions}`;
-          try {
-            const recipe = await aiExtraction.extractRecipe(rawText, 'scraped');
-            if (aiExtraction.isValidRecipe(recipe)) {
-              result.success = true;
-              result.recipe = recipe;
-              result.source = `linked-url:${scraped.source}`;
-              updateStep('Checking linked sites', 'completed', `Recipe found on ${safeHostname(linkedUrl)}`);
-              logger.info('Recipe extracted from linked URL via AI', { url, linkedUrl });
-              return result;
-            }
-          } catch (err) {
-            logger.warn('AI extraction from scraped content failed', { linkedUrl, error: err.message });
-          }
-        }
-      }
-
-      updateStep('Checking linked sites', 'completed', 'No recipe found in linked sites');
-    } else {
-      updateStep('Checking linked sites', 'skipped', 'No links in description');
-      result.attempts.push({ source: 'linked-urls', status: 'skipped', reason: 'no links found' });
+      return result;
     }
 
-    // All sources exhausted
+    // All sources exhausted or insufficient
+    // Future: Phase 2 (video frame analysis) would be triggered here
+    if (candidates.length > 0) {
+      // Return best partial result even if below threshold
+      const best = candidates[0];
+      result.success = true;
+      result.recipe = best.recipe;
+      result.source = best.source;
+      result.completeness = best.score;
+
+      logger.info('Returning best partial recipe (below threshold)', {
+        url,
+        source: best.source,
+        completeness: best.score,
+      });
+
+      return result;
+    }
+
     result.success = false;
     const triedSources = result.attempts
       .filter(a => a.status === 'tried')
@@ -217,6 +152,149 @@ async function extractRecipeFromVideo(url, options = {}) {
     logger.error('Orchestrator error', { url, error: error.message });
     throw error;
   }
+}
+
+/**
+ * Try extracting recipe from linked URLs in the description
+ * @returns {{ recipe, source, score }|null}
+ */
+async function tryLinkedUrls(analysis, result, updateStep) {
+  if (analysis.linkedUrls.length === 0) {
+    updateStep('Checking linked sites', 'skipped', 'No links in description');
+    result.attempts.push({ source: 'linked-urls', status: 'skipped', reason: 'no links found' });
+    return null;
+  }
+
+  updateStep('Checking linked sites', 'in-progress');
+  const urlsToTry = analysis.linkedUrls.slice(0, 3);
+
+  for (const linkedUrl of urlsToTry) {
+    result.attempts.push({ source: 'linked-url', url: linkedUrl, status: 'tried' });
+
+    try {
+      const scraped = await linkScraper.scrapeRecipe(linkedUrl);
+
+      if (scraped.success && scraped.recipe) {
+        let recipe = null;
+
+        // If scraper returned structured data, check if it's complete enough
+        if (scraped.recipe.title && (scraped.recipe.ingredients || scraped.recipe.instructions)) {
+          if (aiExtraction.isValidRecipe(scraped.recipe)) {
+            recipe = aiExtraction.normalizeRecipe(scraped.recipe);
+          }
+        }
+
+        // Raw content — send to AI for extraction
+        if (!recipe) {
+          const rawText = `Title: ${scraped.recipe.title}\nIngredients:\n${scraped.recipe.ingredients}\nInstructions:\n${scraped.recipe.instructions}`;
+          try {
+            recipe = await aiExtraction.extractRecipe(rawText, 'scraped');
+          } catch (err) {
+            logger.warn('AI extraction from scraped content failed', { linkedUrl, error: err.message });
+          }
+        }
+
+        if (recipe && aiExtraction.isValidRecipe(recipe)) {
+          const { score } = scoreRecipe(recipe);
+          const hostname = safeHostname(linkedUrl);
+          updateStep('Checking linked sites', 'completed', `Recipe found on ${hostname}`);
+          logger.info('Recipe extracted from linked URL', { linkedUrl, score, source: scraped.source });
+          return { recipe, source: `linked-url:${scraped.source}`, score };
+        }
+      }
+    } catch (err) {
+      logger.warn('Linked URL scraping failed', { linkedUrl, error: err.message });
+    }
+  }
+
+  updateStep('Checking linked sites', 'completed', 'No recipe found in linked sites');
+  return null;
+}
+
+/**
+ * Try extracting recipe from description text via AI
+ * @returns {{ recipe, source, score }|null}
+ */
+async function tryDescription(analysis, metadata, result, updateStep) {
+  if (!metadata || !metadata.description) {
+    updateStep('Checking description', 'skipped', 'No description available');
+    result.attempts.push({ source: 'description', status: 'skipped', reason: 'no description' });
+    return null;
+  }
+
+  updateStep('Checking description', 'in-progress');
+
+  if (!analysis.hasRecipeContent) {
+    result.attempts.push({ source: 'description', status: 'no-recipe-content' });
+    updateStep('Checking description', 'completed', 'No recipe content detected');
+    return null;
+  }
+
+  result.attempts.push({ source: 'description', status: 'tried' });
+
+  try {
+    const recipe = await aiExtraction.extractRecipe(analysis.recipeText, 'description');
+
+    if (aiExtraction.isValidRecipe(recipe)) {
+      const { score } = scoreRecipe(recipe);
+      updateStep('Checking description', 'completed', 'Recipe found in description');
+      logger.info('Recipe extracted from description', { title: recipe.title, score });
+      return { recipe, source: 'description', score };
+    }
+  } catch (err) {
+    result.attempts[result.attempts.length - 1].error = err.message;
+    logger.warn('AI extraction from description failed', { error: err.message });
+  }
+
+  updateStep('Checking description', 'completed', 'No recipe found');
+  return null;
+}
+
+/**
+ * Try extracting recipe from transcript/captions via AI
+ * @returns {{ recipe, source, score }|null}
+ */
+async function tryTranscript(transcript, transcriptResult, result, updateStep) {
+  if (!transcript || !transcript.text) {
+    const reason = transcriptResult.status === 'rejected'
+      ? transcriptResult.reason?.message || 'extraction failed'
+      : 'no transcript';
+    updateStep('Extracting captions', 'skipped', reason);
+    result.attempts.push({ source: 'transcript', status: 'skipped', reason });
+    return null;
+  }
+
+  updateStep('Extracting captions', 'in-progress');
+
+  const cleanedTranscript = transcript.text
+    .replace(/\[.*?\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (cleanedTranscript.length < MIN_TRANSCRIPT_LENGTH) {
+    updateStep('Extracting captions', 'completed', 'No meaningful captions found');
+    result.attempts.push({ source: 'transcript', status: 'insufficient', length: cleanedTranscript.length });
+    return null;
+  }
+
+  result.attempts.push({ source: 'transcript', status: 'tried' });
+
+  try {
+    const recipe = await aiExtraction.extractRecipe(transcript.text, 'transcript');
+
+    if (aiExtraction.isValidRecipe(recipe)) {
+      const { score } = scoreRecipe(recipe);
+      updateStep('Extracting captions', 'completed', 'Recipe found in captions');
+      logger.info('Recipe extracted from transcript', { title: recipe.title, score });
+      return { recipe, source: 'transcript', score };
+    }
+  } catch (err) {
+    result.attempts[result.attempts.length - 1].error = err.message;
+    logger.warn('AI extraction from transcript failed', { error: err.message });
+  }
+
+  updateStep('Extracting captions', 'completed', 'Could not extract recipe from captions');
+  return null;
 }
 
 /**
