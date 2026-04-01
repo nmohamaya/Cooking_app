@@ -239,20 +239,139 @@ function extractMicrodata($) {
  * @returns {object|null} Normalized recipe or null
  */
 function extractFromHtml($) {
-  // Look for common recipe card class names
+  // Strategy 1: Heading-based section detection (most common pattern)
+  // Look for headings like "Ingredients", "Instructions", "Steps", "Directions"
+  const headingResult = extractByHeadings($);
+  if (headingResult) return headingResult;
+
+  // Strategy 2: CSS class-based extraction from recipe card widgets
+  const classResult = extractByClasses($);
+  if (classResult) return classResult;
+
+  return null;
+}
+
+/**
+ * Extract recipe by finding heading labels ("Ingredients", "Steps", etc.)
+ * and collecting content after each heading until the next heading.
+ * @param {cheerio.CheerioAPI} $
+ * @returns {object|null}
+ */
+function extractByHeadings($) {
+  const INGREDIENT_HEADINGS = /^ingredients$/i;
+  const INSTRUCTION_HEADINGS = /^(instructions?|steps?|directions?|method|preparation|how to make)/i;
+
+  let ingredientHeading = null;
+  let instructionHeading = null;
+
+  // Search all headings and bold labels for section markers
+  $('h1, h2, h3, h4, h5, strong, b').each((_, el) => {
+    const text = $(el).text().trim();
+    if (!ingredientHeading && INGREDIENT_HEADINGS.test(text)) {
+      ingredientHeading = $(el);
+    }
+    if (!instructionHeading && INSTRUCTION_HEADINGS.test(text)) {
+      instructionHeading = $(el);
+    }
+  });
+
+  if (!ingredientHeading && !instructionHeading) return null;
+
+  const ingredients = ingredientHeading ? collectSectionContent($, ingredientHeading) : [];
+  const instructions = instructionHeading ? collectSectionContent($, instructionHeading) : [];
+
+  if (ingredients.length === 0 && instructions.length === 0) return null;
+
+  // Find a page title
+  const title = $('h1').first().text().trim()
+    || $('h2').first().text().trim()
+    || $('title').text().trim().split(/[|\-–]/).shift().trim();
+
+  return {
+    title: title || '',
+    ingredients: ingredients.join('\n'),
+    instructions: instructions.map((s, i) => `${i + 1}. ${s}`).join('\n'),
+    prepTime: '',
+    cookTime: '',
+    totalTime: '',
+    servings: '',
+    category: '',
+  };
+}
+
+/**
+ * Collect list items or text blocks following a heading until the next heading.
+ * @param {cheerio.CheerioAPI} $
+ * @param {cheerio.Cheerio} headingEl - The heading element
+ * @returns {string[]} Extracted text items
+ */
+function collectSectionContent($, headingEl) {
+  const items = [];
+
+  // First check if the heading's parent/container has a list
+  const parent = headingEl.parent();
+  const siblingList = parent.find('ul, ol').first();
+  if (siblingList.length > 0) {
+    siblingList.find('li').each((_, li) => {
+      const t = $(li).text().trim();
+      if (t) items.push(t);
+    });
+    if (items.length > 0) return items;
+  }
+
+  // Walk siblings after the heading element
+  let current = headingEl.next();
+  const headingTags = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'STRONG']);
+  let safety = 0;
+
+  while (current.length > 0 && safety < 50) {
+    safety++;
+    const tag = current.prop('tagName');
+
+    // Stop at the next heading-level element
+    if (headingTags.has(tag)) {
+      const text = current.text().trim();
+      // Only stop if it looks like a new section heading (not a sub-step)
+      if (text.length < 60) break;
+    }
+
+    // Extract from list items
+    if (tag === 'UL' || tag === 'OL') {
+      current.find('li').each((_, li) => {
+        const t = $(li).text().trim();
+        if (t) items.push(t);
+      });
+    } else if (tag === 'P' || tag === 'DIV' || tag === 'LI') {
+      const t = current.text().trim();
+      if (t) items.push(t);
+    }
+
+    current = current.next();
+  }
+
+  return items;
+}
+
+/**
+ * Extract recipe using CSS class selectors from common recipe card plugins
+ * @param {cheerio.CheerioAPI} $
+ * @returns {object|null}
+ */
+function extractByClasses($) {
+  // Only match specific recipe card classes, NOT generic page-level classes
   const selectors = [
     '.recipe-card', '.wprm-recipe', '.tasty-recipe', '.recipe-content',
-    '.recipe', '[class*="recipe"]', '#recipe',
+    '.recipe', '#recipe',
   ];
 
   for (const selector of selectors) {
     const el = $(selector).first();
     if (el.length === 0) continue;
 
+    // Skip elements that are too large (likely the whole page)
     const text = el.text().trim();
-    if (text.length < 100) continue;
+    if (text.length < 100 || text.length > 20000) continue;
 
-    // Try to extract structured content from the recipe card
     const title = el.find('h1, h2, h3, .recipe-title, [class*="title"]').first().text().trim();
 
     const ingredients = [];
@@ -262,7 +381,7 @@ function extractFromHtml($) {
     });
 
     const instructions = [];
-    el.find('.instruction, [class*="instruction"] li, .wprm-recipe-instruction, [class*="direction"] li').each((_, item) => {
+    el.find('.instruction, [class*="instruction"] li, .wprm-recipe-instruction, [class*="direction"] li, [class*="step"] li').each((_, item) => {
       const t = $(item).text().trim();
       if (t) instructions.push(t);
     });

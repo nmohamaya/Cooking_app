@@ -177,6 +177,16 @@ async function tryLinkedUrls(analysis, result, updateStep) {
       if (scraped.success && scraped.recipe) {
         let recipe = null;
 
+        logger.debug('Scraped recipe data', {
+          linkedUrl,
+          source: scraped.source,
+          title: scraped.recipe.title,
+          ingredientsLength: scraped.recipe.ingredients?.length,
+          instructionsLength: scraped.recipe.instructions?.length,
+          ingredientsPreview: String(scraped.recipe.ingredients || '').substring(0, 200),
+          instructionsPreview: String(scraped.recipe.instructions || '').substring(0, 200),
+        });
+
         // If scraper returned structured data, check if it's complete enough
         if (scraped.recipe.title && (scraped.recipe.ingredients || scraped.recipe.instructions)) {
           if (aiExtraction.isValidRecipe(scraped.recipe)) {
@@ -186,7 +196,15 @@ async function tryLinkedUrls(analysis, result, updateStep) {
 
         // Raw content — send to AI for extraction
         if (!recipe) {
-          const rawText = `Title: ${scraped.recipe.title}\nIngredients:\n${scraped.recipe.ingredients}\nInstructions:\n${scraped.recipe.instructions}`;
+          const rawText = [
+            `Title: ${scraped.recipe.title || 'Unknown'}`,
+            '',
+            '--- INGREDIENTS ---',
+            scraped.recipe.ingredients || '(none)',
+            '',
+            '--- INSTRUCTIONS ---',
+            scraped.recipe.instructions || '(none)',
+          ].join('\n');
           try {
             recipe = await aiExtraction.extractRecipe(rawText, 'scraped');
           } catch (err) {
