@@ -224,7 +224,7 @@ function extractMicrodata($) {
   return {
     title,
     ingredients: ingredients.join('\n'),
-    instructions: instructions.map((s, i) => `${i + 1}. ${s}`).join('\n'),
+    instructions: formatInstructionSteps(instructions),
     prepTime: parseDuration(recipeEl.find('[itemprop="prepTime"]').attr('content') || ''),
     cookTime: parseDuration(recipeEl.find('[itemprop="cookTime"]').attr('content') || ''),
     totalTime: '',
@@ -290,7 +290,7 @@ function extractByHeadings($) {
   return {
     title: title || '',
     ingredients: ingredients.join('\n'),
-    instructions: instructions.map((s, i) => `${i + 1}. ${s}`).join('\n'),
+    instructions: formatInstructionSteps(instructions),
     prepTime: '',
     cookTime: '',
     totalTime: '',
@@ -390,7 +390,7 @@ function extractByClasses($) {
       return {
         title,
         ingredients: ingredients.join('\n'),
-        instructions: instructions.map((s, i) => `${i + 1}. ${s}`).join('\n'),
+        instructions: formatInstructionSteps(instructions),
         prepTime: '',
         cookTime: '',
         totalTime: '',
@@ -432,6 +432,19 @@ function normalizeInstructions(instructions) {
     }).join('\n');
   }
   return '';
+}
+
+/**
+ * Format instruction steps: strip existing "Step N" or "N." prefixes, then add clean numbering
+ * @param {string[]} steps - Array of instruction text strings
+ * @returns {string} Numbered instruction steps
+ */
+function formatInstructionSteps(steps) {
+  return steps.map((s, i) => {
+    // Strip existing "Step 1", "Step1", "1.", "1)" prefixes to avoid double numbering
+    const cleaned = s.replace(/^step\s*\d+[.:)]?\s*/i, '').replace(/^\d+[.:)]\s*/, '').trim();
+    return `${i + 1}. ${cleaned}`;
+  }).join('\n');
 }
 
 /**
