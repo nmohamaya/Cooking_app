@@ -18,13 +18,14 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../config/logger');
 
-let Ajv, addFormats, recipeValidate, jobValidate, initialized = false;
+let Ajv, addFormats, recipeValidate, jobValidate, initialized = false, initFailed = false;
 
 /**
- * Lazy-initialize validators (avoid loading ajv in production)
+ * Lazy-initialize validators (avoid loading ajv in production).
+ * Only attempts once — if init fails, silently disables validation.
  */
 function init() {
-  if (initialized) return;
+  if (initialized || initFailed) return;
 
   try {
     Ajv = require('ajv/dist/2020');
@@ -44,8 +45,8 @@ function init() {
     initialized = true;
     logger.debug('Contract validation middleware initialized');
   } catch (err) {
-    logger.warn('Contract validation middleware could not initialize', { error: err.message });
-    initialized = false;
+    logger.warn('Contract validation middleware could not initialize — disabling', { error: err.message });
+    initFailed = true;
   }
 }
 

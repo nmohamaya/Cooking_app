@@ -321,7 +321,7 @@ function collectSectionContent($, headingEl) {
 
   // Walk siblings after the heading element
   let current = headingEl.next();
-  const headingTags = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'STRONG']);
+  const headingTags = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'STRONG', 'B']);
   let safety = 0;
 
   while (current.length > 0 && safety < 50) {

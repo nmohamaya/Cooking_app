@@ -6,7 +6,7 @@ import Constants from 'expo-constants';
 // On web: EXPO_PUBLIC_ prefixed env vars are available via process.env
 const GITHUB_TOKEN = Constants.expoConfig?.extra?.githubToken || process.env.EXPO_PUBLIC_GITHUB_TOKEN || '';
 const API_URL = 'https://models.inference.ai.azure.com';
-const MODEL_NAME = process.env.EXPO_PUBLIC_AI_MODEL || 'gpt-4o'; // Free GitHub Models: gpt-4o, gpt-4o-mini, llama-3.1-405b, etc.
+const MODEL_NAME = Constants.expoConfig?.extra?.aiModel || process.env.EXPO_PUBLIC_AI_MODEL || 'gpt-4o'; // Free GitHub Models: gpt-4o, gpt-4o-mini, llama-3.1-405b, etc.
 const EXTRACTION_TIMEOUT = 15000; // 15 second timeout
 
 // Valid categories matching App.js CATEGORIES constant

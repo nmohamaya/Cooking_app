@@ -19,8 +19,9 @@ const VALID_CATEGORIES = [
 // Measurement patterns (imperial + metric)
 const MEASUREMENT_REGEX = /\d+\s*(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|g|grams?|kg|kilograms?|ml|milliliters?|l|liters?|lbs?|pounds?|pints?|quarts?|gallons?|pinch|dash|handful)/i;
 
-// Ordered step patterns
-const ORDERED_STEP_REGEX = /^(\d+[.):\s]|step\s*\d+)/im;
+// Ordered step patterns — require delimiter after number (. ) :) or "Step N"
+// Avoids false positives like "1 cup sugar" matching on "1 "
+const ORDERED_STEP_REGEX = /^(\d+\s*[.):]|step\s*\d+)/im;
 
 // Temperature patterns — require ° symbol, "degrees", or standalone F/C after 3+ digit number
 // to avoid false positives like "2 cups" matching "2 c"

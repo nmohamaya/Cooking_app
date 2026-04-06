@@ -99,6 +99,7 @@ if [ -n "$violations" ]; then
   # Exit with warning (non-zero) — can be set to failure in CI
   exit 1
 else
-  echo "✅ All ${#CHANGED_FILES[@]} changed files are within $ROLE boundaries"
+  FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l)
+  echo "✅ All $FILE_COUNT changed files are within $ROLE boundaries"
   exit 0
 fi

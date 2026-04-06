@@ -11,8 +11,9 @@
 const axios = require('axios');
 const logger = require('../config/logger');
 
-const API_URL = process.env.AI_API_URL || 'https://models.inference.ai.azure.com';
-const MODEL_NAME = process.env.AI_MODEL || 'gpt-4o';
+const config = require('../config/env');
+const API_URL = config.aiApiUrl;
+const MODEL_NAME = config.aiModel;
 const EXTRACTION_TIMEOUT = 15000; // 15 seconds
 
 // Valid categories matching the frontend App.js CATEGORIES constant
