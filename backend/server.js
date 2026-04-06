@@ -61,12 +61,30 @@ app.get('/api/version', (req, res) => {
   });
 });
 
-// Routes
-app.use('/api/download', require('./routes/download')); // Phase 2
-app.use('/api/transcribe', require('./routes/transcribe')); // Phase 3
-app.use('/api/recipes', require('./routes/recipes')); // Phase 4
-app.use('/api/cost', require('./routes/cost')); // Phase 6
-app.use('/api/extract', require('./routes/extract')); // Extraction cascade
+// Routes — versioned under /api/v1/, with /api/ aliases for backward compatibility
+const downloadRoutes = require('./routes/download');    // Phase 2
+const transcribeRoutes = require('./routes/transcribe'); // Phase 3
+const recipesRoutes = require('./routes/recipes');       // Phase 4
+const costRoutes = require('./routes/cost');              // Phase 6
+const extractRoutes = require('./routes/extract');        // Extraction cascade
+const featuresRoutes = require('./routes/features');      // Feature flags dashboard
+const { interceptExtractResponses } = require('./middleware/contractValidator');
+
+// Versioned routes (preferred)
+app.use('/api/v1/download', downloadRoutes);
+app.use('/api/v1/transcribe', transcribeRoutes);
+app.use('/api/v1/recipes', recipesRoutes);
+app.use('/api/v1/cost', costRoutes);
+app.use('/api/v1/extract', interceptExtractResponses(), extractRoutes);
+app.use('/api/v1/features', featuresRoutes);
+
+// Backward-compatible aliases (unversioned)
+app.use('/api/download', downloadRoutes);
+app.use('/api/transcribe', transcribeRoutes);
+app.use('/api/recipes', recipesRoutes);
+app.use('/api/cost', costRoutes);
+app.use('/api/extract', interceptExtractResponses(), extractRoutes);
+app.use('/api/features', featuresRoutes);
 
 // 404 handler
 app.use((req, res) => {

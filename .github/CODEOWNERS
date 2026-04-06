@@ -1,2 +1,35 @@
 # Code ownership and review requirements
+#
+# Each line defines who must review changes to matching files.
+# When adding team members, replace placeholder usernames below.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner — catches everything not matched below
 * @nav
+
+# Shared configuration — tech lead approval required
+CLAUDE.md                       @nav
+CLAUDE_multiagent.md            @nav
+.claude/                        @nav
+.github/                        @nav
+
+# Backend — backend developer + tech lead
+/backend/                       @nav
+# /backend/                     @nav @backend-dev-username
+
+# Frontend — frontend developer + tech lead
+/MyRecipeApp/                   @nav
+# /MyRecipeApp/                 @nav @frontend-dev-username
+
+# CI/CD and deployment — devops + tech lead
+/.github/workflows/             @nav
+/deploy.sh                      @nav
+/scripts/                       @nav
+# /.github/workflows/           @nav @devops-username
+
+# Documentation
+/docs/                          @nav
+
+# Store and design assets
+/graphics/                      @nav
+/store_listing/                 @nav

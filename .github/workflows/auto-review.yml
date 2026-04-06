@@ -1,0 +1,64 @@
+name: Auto Review (Agent)
+
+# Runs a quick automated review on every PR using Claude.
+# This is a lightweight first-pass — not a replacement for human review.
+#
+# Prerequisites:
+#   - Set ANTHROPIC_API_KEY as a repository secret
+#   - Install Claude Code CLI in the CI environment
+#
+# To enable: uncomment the steps below and add the secret.
+# Currently disabled — serves as a template for when you're ready.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main, develop]
+
+jobs:
+  auto-review:
+    runs-on: ubuntu-latest
+    name: Agent Quick Review
+    if: false  # Set to true when ready to enable
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Get PR diff
+      id: diff
+      run: |
+        git diff origin/${{ github.base_ref }}...HEAD > /tmp/pr-diff.txt
+        DIFF_SIZE=$(wc -l < /tmp/pr-diff.txt)
+        echo "diff_size=$DIFF_SIZE" >> $GITHUB_OUTPUT
+        echo "PR diff: $DIFF_SIZE lines"
+
+    - name: Run agent quick review
+      if: steps.diff.outputs.diff_size < 500
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      run: |
+        # Install Claude Code CLI
+        # npm install -g @anthropic-ai/claude-code
+
+        # Run the quick reviewer agent
+        # REVIEW=$(claude --model claude-sonnet-4-6 --print \
+        #   "$(cat .claude/agents/reviewer-quick.md)" \
+        #   "Review this PR diff and output your findings in the format specified in your instructions:
+        #
+        #   $(cat /tmp/pr-diff.txt | head -2000)")
+
+        # Post review as PR comment
+        # gh pr comment ${{ github.event.pull_request.number }} --body "$REVIEW"
+
+        echo "Auto-review template ready. Enable by setting if: true and adding ANTHROPIC_API_KEY secret."
+
+    - name: Skip large PR
+      if: steps.diff.outputs.diff_size >= 500
+      run: |
+        echo "PR too large for auto-review (${{ steps.diff.outputs.diff_size }} lines). Use the full reviewer (Opus) manually."
+        # gh pr comment ${{ github.event.pull_request.number }} \
+        #   --body "This PR is too large for auto-review. Please request a manual review using the full reviewer agent (Opus 4.6)."

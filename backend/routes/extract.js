@@ -238,6 +238,7 @@ async function processExtractionJob(jobId) {
       job.result = {
         recipe: result.recipe,
         source: result.source,
+        completeness: result.completeness,
         metadata: result.metadata,
         attempts: result.attempts,
         timestamp: new Date().toISOString(),

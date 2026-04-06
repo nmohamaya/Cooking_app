@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh issue:*)"
+    ]
+  },
+  "hooks": {
+    "preToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'AGENT_ROLE=\"${CLAUDE_AGENT_ROLE:-}\"; FILE=\"$TOOL_INPUT_FILE_PATH\"; if [ -z \"$FILE\" ]; then FILE=\"$(echo $TOOL_INPUT | jq -r .file_path // .path // empty 2>/dev/null)\"; fi; if [ -z \"$FILE\" ] || [ -z \"$AGENT_ROLE\" ]; then exit 0; fi; case \"$AGENT_ROLE\" in backend-dev) case \"$FILE\" in */MyRecipeApp/*|*/.github/*|*/CLAUDE.md) echo \"BOUNDARY VIOLATION: backend-dev agent cannot modify $FILE\" >&2; exit 1;; esac;; frontend-dev) case \"$FILE\" in */backend/*|*/deploy.sh|*/.github/*|*/CLAUDE.md) echo \"BOUNDARY VIOLATION: frontend-dev agent cannot modify $FILE\" >&2; exit 1;; esac;; qa-engineer) case \"$FILE\" in */backend/services/*|*/backend/routes/*|*/backend/config/*|*/MyRecipeApp/screens/*|*/MyRecipeApp/components/*|*/MyRecipeApp/services/*|*/MyRecipeApp/App.js) echo \"BOUNDARY VIOLATION: qa-engineer agent cannot modify production code $FILE\" >&2; exit 1;; esac;; reviewer|reviewer-quick) echo \"BOUNDARY VIOLATION: reviewer agents cannot modify files\" >&2; exit 1;; esac; exit 0'"
+          }
+        ]
+      }
+    ]
+  }
+}
