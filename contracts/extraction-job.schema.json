@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extraction-job.schema.json",
+  "title": "ExtractionJob",
+  "version": "1.0.0",
+  "description": "Response shape for GET /api/v1/extract/:jobId. Shared contract between backend extract route and frontend videoExtractionService.",
+  "type": "object",
+  "required": ["status", "steps"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["processing", "completed", "failed"],
+      "description": "Current job status"
+    },
+    "steps": {
+      "type": "array",
+      "description": "Progress steps shown in the UI",
+      "items": {
+        "type": "object",
+        "required": ["name", "status"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Step display name (e.g., 'Fetching video info')"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in-progress", "completed", "skipped", "failed"],
+            "description": "Step status — maps to visual styles in TranscriptionProgress.js"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Optional detail message (e.g., 'Recipe found on recipe30.com')"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this step status was last updated"
+          }
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "description": "Present when status is 'completed'",
+      "properties": {
+        "recipe": {
+          "$ref": "recipe.schema.json",
+          "description": "The extracted recipe"
+        },
+        "source": {
+          "type": "string",
+          "description": "Which extraction source won (e.g., 'linked-url:json-ld', 'description', 'transcript')"
+        },
+        "completeness": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 12,
+          "description": "Recipe completeness score (0-12)"
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "uploader": { "type": "string" },
+            "duration": { "type": ["number", "string"] }
+          },
+          "description": "Video metadata"
+        },
+        "attempts": {
+          "type": "array",
+          "description": "Log of all source extraction attempts",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": { "type": "string" },
+              "status": { "type": "string" },
+              "reason": { "type": "string" },
+              "url": { "type": "string" },
+              "error": { "type": "string" }
+            }
+          }
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "error": {
+      "type": "string",
+      "description": "Error message when status is 'failed'"
+    }
+  }
+}

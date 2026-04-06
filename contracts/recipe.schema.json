@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "recipe.schema.json",
+  "title": "Recipe",
+  "version": "1.0.0",
+  "description": "A recipe extracted from a cooking video or website. This is the shared contract between backend and frontend.",
+  "type": "object",
+  "required": ["title", "category", "ingredients", "instructions"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Recipe name"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["Breakfast", "Lunch", "Dinner", "Dessert", "Snacks", "Appetizers", "Asian", "Vegan", "Vegetarian"],
+      "description": "Recipe category — must be one of the predefined values"
+    },
+    "ingredients": {
+      "type": "string",
+      "description": "Newline-separated list of ingredients"
+    },
+    "instructions": {
+      "type": "string",
+      "description": "Numbered steps (e.g., '1. Preheat oven...')"
+    },
+    "prepTime": {
+      "type": "string",
+      "description": "Preparation time (e.g., '15 minutes')",
+      "default": ""
+    },
+    "cookTime": {
+      "type": "string",
+      "description": "Cooking time (e.g., '30 minutes')",
+      "default": ""
+    },
+    "servings": {
+      "type": "string",
+      "description": "Number of servings (e.g., '4 servings')",
+      "default": ""
+    }
+  },
+  "additionalProperties": false
+}

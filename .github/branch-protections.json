@@ -5,14 +5,22 @@
       "protection": {
         "required_status_checks": {
           "strict": true,
-          "contexts": ["quality", "test", "security", "build"]
+          "contexts": ["quality", "test", "security", "build", "pr-size"]
         },
         "required_pull_request_reviews": {
           "required_approving_review_count": 1,
           "dismiss_stale_reviews": true
         },
         "enforce_admins": true,
-        "restrictions": null
+        "restrictions": null,
+        "merge_queue": {
+          "enabled": true,
+          "merge_method": "squash",
+          "max_entries_to_build": 3,
+          "min_entries_to_merge": 1,
+          "check_response_timeout_minutes": 15,
+          "_note": "Enable merge queue in GitHub repo settings > Rules > Branch protection > Require merge queue. This config documents the desired settings."
+        }
       }
     },
     {
@@ -24,5 +32,6 @@
         }
       }
     }
-  ]
+  ],
+  "_merge_queue_setup": "To enable merge queue: GitHub repo > Settings > Rules > Branch protection for 'main' > check 'Require merge queue'. Set merge method to squash, build concurrency to 3."
 }

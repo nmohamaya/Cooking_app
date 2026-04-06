@@ -130,17 +130,71 @@ jobs:
         sleep 5
         kill %1 || true
 
+  # PR Size Check (only on pull requests)
+  pr-size:
+    runs-on: ubuntu-latest
+    name: PR Size Check
+    if: github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check PR diff size
+      run: |
+        # Count lines changed, excluding test files and generated files
+        DIFF_LINES=$(git diff --stat origin/${{ github.base_ref }}...HEAD -- \
+          ':!**/*.test.js' ':!**/*.test.ts' ':!**/package-lock.json' \
+          ':!**/__snapshots__/*' ':!**/coverage/*' \
+          | tail -1 | grep -oP '\d+ insertion' | grep -oP '\d+' || echo "0")
+        DEL_LINES=$(git diff --stat origin/${{ github.base_ref }}...HEAD -- \
+          ':!**/*.test.js' ':!**/*.test.ts' ':!**/package-lock.json' \
+          ':!**/__snapshots__/*' ':!**/coverage/*' \
+          | tail -1 | grep -oP '\d+ deletion' | grep -oP '\d+' || echo "0")
+        TOTAL=$((${DIFF_LINES:-0} + ${DEL_LINES:-0}))
+
+        echo "PR size: $TOTAL lines changed (excluding tests/generated)"
+
+        if [ "$TOTAL" -gt 800 ]; then
+          echo "::warning::PR is large ($TOTAL lines). Consider splitting into smaller PRs (target: <500 lines)."
+        fi
+
+        if [ "$TOTAL" -gt 1500 ]; then
+          echo "::error::PR exceeds 1500 lines changed. Please split into smaller PRs."
+          exit 1
+        fi
+
+  # Agent Boundary Check (only on pull requests)
+  agent-boundaries:
+    runs-on: ubuntu-latest
+    name: Agent Boundary Check
+    if: github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check agent file boundaries
+      run: |
+        chmod +x scripts/check-agent-boundaries.sh
+        scripts/check-agent-boundaries.sh "origin/${{ github.base_ref }}" || true
+        # Non-blocking — logs warnings but doesn't fail the build.
+        # Tech-lead can override boundary violations via PR approval.
+
   # Final Status
   ci-status:
     runs-on: ubuntu-latest
     name: CI Pipeline Status
-    needs: [quality, test, security, build]
+    needs: [quality, test, security, build, pr-size, agent-boundaries]
     if: always()
     steps:
     - name: Check CI Status
       run: |
         if [[ "${{ needs.quality.result }}" == "failure" || "${{ needs.test.result }}" == "failure" || "${{ needs.security.result }}" == "failure" || "${{ needs.build.result }}" == "failure" ]]; then
           echo "❌ CI Pipeline Failed"
+          exit 1
+        elif [[ "${{ needs.pr-size.result }}" == "failure" ]]; then
+          echo "❌ PR too large — please split"
           exit 1
         else
           echo "✅ CI Pipeline Passed"

@@ -1,11 +1,29 @@
 #!/bin/sh
 # Pre-commit hook - runs tests and security checks before committing
 
-cd MyRecipeApp
+REPO_ROOT=$(git rev-parse --show-toplevel)
 
 echo "🔍 Running pre-commit checks..."
 
-# Run tests
+# --- Contract schema change detection ---
+CONTRACT_FILES=$(git diff --cached --name-only -- 'contracts/*.schema.json')
+if [ -n "$CONTRACT_FILES" ]; then
+  echo "📋 Contract schema changes detected — validating..."
+  echo "   Changed: $CONTRACT_FILES"
+
+  cd "$REPO_ROOT/backend"
+  npx jest tests/contractValidation.test.js tests/agent-knowledge.test.js --bail --no-cache 2>&1 | tail -5
+  if [ $? -ne 0 ]; then
+    echo "❌ Contract validation tests failed. Commit aborted."
+    echo "   Fix the schema or update tests to match."
+    exit 1
+  fi
+  echo "✅ Contract schemas valid"
+fi
+
+# --- Frontend tests ---
+cd "$REPO_ROOT/MyRecipeApp"
+
 echo "📝 Running tests..."
 npm test -- --passWithNoTests --bail
 if [ $? -ne 0 ]; then
