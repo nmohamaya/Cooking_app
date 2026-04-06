@@ -111,15 +111,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ───────────────────────────────────────────────
-# Report-only mode
-# ───────────────────────────────────────────────
-
-if [ "$REPORT_ONLY" = true ]; then
-  print_header "Session Reports"
-  generate_end_report
-  exit 0
-fi
+# Note: --report-only and --health checks are handled after function definitions below
 
 # ───────────────────────────────────────────────
 # Phase 1: Pre-flight checks

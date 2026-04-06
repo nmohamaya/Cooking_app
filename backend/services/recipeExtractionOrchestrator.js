@@ -167,6 +167,7 @@ async function tryLinkedUrls(analysis, result, updateStep) {
 
   updateStep('Checking linked sites', 'in-progress');
   const urlsToTry = analysis.linkedUrls.slice(0, 3);
+  let bestCandidate = null;
 
   for (const linkedUrl of urlsToTry) {
     result.attempts.push({ source: 'linked-url', url: linkedUrl, status: 'tried' });
@@ -214,15 +215,30 @@ async function tryLinkedUrls(analysis, result, updateStep) {
 
         if (recipe && aiExtraction.isValidRecipe(recipe)) {
           const { score } = scoreRecipe(recipe);
-          const hostname = safeHostname(linkedUrl);
-          updateStep('Checking linked sites', 'completed', `Recipe found on ${hostname}`);
+          const candidate = { recipe, source: `linked-url:${scraped.source}`, score };
           logger.info('Recipe extracted from linked URL', { linkedUrl, score, source: scraped.source });
-          return { recipe, source: `linked-url:${scraped.source}`, score };
+
+          // Early exit if we hit COMPLETE threshold — no need to try more URLs
+          if (score >= THRESHOLDS.COMPLETE) {
+            const hostname = safeHostname(linkedUrl);
+            updateStep('Checking linked sites', 'completed', `Recipe found on ${hostname}`);
+            return candidate;
+          }
+
+          // Keep the best candidate so far
+          if (!bestCandidate || score > bestCandidate.score) {
+            bestCandidate = candidate;
+          }
         }
       }
     } catch (err) {
       logger.warn('Linked URL scraping failed', { linkedUrl, error: err.message });
     }
+  }
+
+  if (bestCandidate) {
+    updateStep('Checking linked sites', 'completed', `Best recipe scored ${bestCandidate.score}/12`);
+    return bestCandidate;
   }
 
   updateStep('Checking linked sites', 'completed', 'No recipe found in linked sites');
@@ -248,7 +264,8 @@ async function tryDescription(analysis, metadata, result, updateStep) {
     return null;
   }
 
-  result.attempts.push({ source: 'description', status: 'tried' });
+  const descAttempt = { source: 'description', status: 'tried' };
+  result.attempts.push(descAttempt);
 
   try {
     const recipe = await aiExtraction.extractRecipe(analysis.recipeText, 'description');
@@ -260,7 +277,7 @@ async function tryDescription(analysis, metadata, result, updateStep) {
       return { recipe, source: 'description', score };
     }
   } catch (err) {
-    result.attempts[result.attempts.length - 1].error = err.message;
+    descAttempt.error = err.message;
     logger.warn('AI extraction from description failed', { error: err.message });
   }
 
@@ -295,7 +312,8 @@ async function tryTranscript(transcript, transcriptResult, result, updateStep) {
     return null;
   }
 
-  result.attempts.push({ source: 'transcript', status: 'tried' });
+  const transcriptAttempt = { source: 'transcript', status: 'tried' };
+  result.attempts.push(transcriptAttempt);
 
   try {
     const recipe = await aiExtraction.extractRecipe(transcript.text, 'transcript');
@@ -307,7 +325,7 @@ async function tryTranscript(transcript, transcriptResult, result, updateStep) {
       return { recipe, source: 'transcript', score };
     }
   } catch (err) {
-    result.attempts[result.attempts.length - 1].error = err.message;
+    transcriptAttempt.error = err.message;
     logger.warn('AI extraction from transcript failed', { error: err.message });
   }
 

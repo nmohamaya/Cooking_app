@@ -142,15 +142,15 @@ jobs:
 
     - name: Check PR diff size
       run: |
-        # Count lines changed, excluding test files and generated files
-        DIFF_LINES=$(git diff --stat origin/${{ github.base_ref }}...HEAD -- \
+        # Count lines changed using numstat, excluding test files and generated files
+        DIFF_LINES=$(git diff --numstat origin/${{ github.base_ref }}...HEAD -- \
           ':!**/*.test.js' ':!**/*.test.ts' ':!**/package-lock.json' \
           ':!**/__snapshots__/*' ':!**/coverage/*' \
-          | tail -1 | grep -oP '\d+ insertion' | grep -oP '\d+' || echo "0")
-        DEL_LINES=$(git diff --stat origin/${{ github.base_ref }}...HEAD -- \
+          | awk '{sum += $1} END {print sum+0}')
+        DEL_LINES=$(git diff --numstat origin/${{ github.base_ref }}...HEAD -- \
           ':!**/*.test.js' ':!**/*.test.ts' ':!**/package-lock.json' \
           ':!**/__snapshots__/*' ':!**/coverage/*' \
-          | tail -1 | grep -oP '\d+ deletion' | grep -oP '\d+' || echo "0")
+          | awk '{sum += $2} END {print sum+0}')
         TOTAL=$((${DIFF_LINES:-0} + ${DEL_LINES:-0}))
 
         echo "PR size: $TOTAL lines changed (excluding tests/generated)"

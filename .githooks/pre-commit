@@ -12,12 +12,15 @@ if [ -n "$CONTRACT_FILES" ]; then
   echo "   Changed: $CONTRACT_FILES"
 
   cd "$REPO_ROOT/backend"
-  npx jest tests/contractValidation.test.js tests/agent-knowledge.test.js --bail --no-cache 2>&1 | tail -5
-  if [ $? -ne 0 ]; then
+  JEST_OUTPUT=$(mktemp)
+  if ! npx jest tests/contractValidation.test.js tests/agent-knowledge.test.js --bail --no-cache >"$JEST_OUTPUT" 2>&1; then
+    tail -5 "$JEST_OUTPUT"
+    rm -f "$JEST_OUTPUT"
     echo "❌ Contract validation tests failed. Commit aborted."
     echo "   Fix the schema or update tests to match."
     exit 1
   fi
+  rm -f "$JEST_OUTPUT"
   echo "✅ Contract schemas valid"
 fi
 
