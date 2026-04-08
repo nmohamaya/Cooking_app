@@ -1,10 +1,14 @@
-# Secrets and sensitive files
+# Secrets and sensitive files — NEVER commit real tokens or credentials
 *.keystore
 *.jks
 *.key
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
+.env.development
+# Only .env.example files (with placeholders) should be tracked
 
 # Credentials and tokens
 KEYSTORE_PASSWORD.txt
